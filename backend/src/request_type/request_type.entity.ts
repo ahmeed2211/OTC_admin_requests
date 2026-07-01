@@ -1,27 +1,30 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, UpdateDateColumn,
+  OneToMany, CreateDateColumn,
 } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { RequestTypeField } from './request_type_field.entity';
 
-@Entity('request_types')
+@Entity('RequestTypes')
 export class RequestType {
-  @ApiProperty() 
-  @PrimaryGeneratedColumn('uuid') 
+
+  @PrimaryGeneratedColumn('uuid')
   id: string;
-  @ApiProperty() 
-  @Column({ unique: true }) 
+
+  @Column({ unique: true })
   name: string;
-  @ApiProperty() 
-  @Column({ nullable: true }) 
+
+  @Column({ type: 'text', nullable: true })
   description: string;
-  @ApiProperty() 
-  @Column({ default: true }) 
+
+  @Column({ default: true })
   isActive: boolean;
-  @ApiProperty() 
-  @CreateDateColumn() 
+
+  @CreateDateColumn()
   createdAt: Date;
-  @ApiProperty() 
-  @UpdateDateColumn() 
-  updatedAt: Date;
+
+  @OneToMany(() => RequestTypeField, (field) => field.requestType, {
+    cascade: true,
+    eager: true,
+  })
+  fields: RequestTypeField[];
 }

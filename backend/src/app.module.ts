@@ -11,10 +11,14 @@ import { UserModule } from './user/user.module';
 import { RequestModule } from './request/request.module';
 import { RequestTypeModule } from './request_type/request_type.module';
 import {AuthModule} from './auth/auth.modue';
+import {RequestTypeField} from './request_type/request_type_field.entity';
+import {RequestFieldValue} from './request_type/request_field_value.entity';
+import {NotificationModule} from './notifications/notification.module';
+
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-
+    NotificationModule, 
     ConfigModule.forRoot({
       isGlobal: true,
       load:[databaseConfig]
@@ -34,6 +38,8 @@ import {AuthModule} from './auth/auth.modue';
           User,
           Request,
           RequestType,
+          RequestTypeField,  
+          RequestFieldValue, 
         ],
       }),
     }),

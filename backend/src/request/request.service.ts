@@ -1,22 +1,20 @@
 import {
-  Injectable,
-  ConflictException,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
+  Injectable, ConflictException, NotFoundException,
+  ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, FindOptionsWhere } from 'typeorm';
+import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Request } from './request.entity';
+import { RequestFieldValue } from '../request_type/request_field_value.entity';
+import { RequestTypeField } from '../request_type/request_type_field.entity';
 import {
-  CreateRequestDto,
-  UpdateRequestStatusDto,
-  AddCommentDto,
-  AddAttachmentsDto,
-  FilterRequestsDto,
+  CreateRequestDto, UpdateRequestStatusDto,
+  AddCommentDto, AddAttachmentsDto, FilterRequestsDto,
 } from './request.dto';
 import { RequestStatus, UserRole } from '../common/enums';
 import { User } from '../user/user.entity';
+import { REQUEST_EVENTS } from '../request/request.events';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -29,6 +27,7 @@ export interface DashboardStats {
   inProgress: number;
   accepted: number;
   rejected: number;
+  confirmed: number;
 }
 
 export interface AdminDashboardStats extends DashboardStats {
@@ -40,252 +39,255 @@ export class RequestService {
   constructor(
     @InjectRepository(Request)
     private readonly requestRepository: Repository<Request>,
+    @InjectRepository(RequestFieldValue)
+    private readonly fieldValueRepository: Repository<RequestFieldValue>,
+    @InjectRepository(RequestTypeField)
+    private readonly fieldRepository: Repository<RequestTypeField>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
-  async createRequest(
-    createRequestDto: CreateRequestDto,
-    currentUser: User,
-  ): Promise<Request> {
-    const { fromDate, toDate, requestTypeId } = createRequestDto;
 
-    // Validate date range
-    if (new Date(fromDate) >= new Date(toDate)) {
-      throw new BadRequestException('fromDate must be strictly before toDate');
+  // ─── Agent: Create request ─────────────────────────────────────────────────
+
+  async createRequest(dto: CreateRequestDto, currentUser: User): Promise<Request> {
+    if (new Date(dto.fromDate) >= new Date(dto.toDate)) {
+      throw new BadRequestException('fromDate must be strictly before toDate.');
     }
 
-    // Check for an overlapping PENDING or IN_PROGRESS request of the same type
     const overlapping = await this.requestRepository
       .createQueryBuilder('r')
       .where('r.userId = :userId', { userId: currentUser.id })
-      .andWhere('r.requestTypeId = :requestTypeId', { requestTypeId })
-      .andWhere('r.requestStatus IN (:...activeStatuses)', {
-        activeStatuses: [RequestStatus.PENDING, RequestStatus.IN_PROGRESS],
+      .andWhere('r.requestTypeId = :requestTypeId', { requestTypeId: dto.requestTypeId })
+      .andWhere('r.requestStatus IN (:...active)', {
+        active: [RequestStatus.PENDING, RequestStatus.IN_PROGRESS],
       })
-      .andWhere('r.fromDate <= :toDate', { toDate })
-      .andWhere('r.toDate >= :fromDate', { fromDate })
+      .andWhere('r.fromDate <= :toDate', { toDate: dto.toDate })
+      .andWhere('r.toDate >= :fromDate', { fromDate: dto.fromDate })
       .getOne();
 
     if (overlapping) {
-      throw new ConflictException(
-        'You already have an active request of this type that overlaps the requested period.',
-      );
+      throw new ConflictException('You already have an active request of this type overlapping the requested period.');
+    }
+
+    const typeFields = await this.fieldRepository.find({
+      where: { requestTypeId: dto.requestTypeId },
+    });
+
+    const submittedFieldIds = dto.fieldValues.map((fv) => fv.fieldId);
+    const missingRequired = typeFields
+      .filter((f) => f.isRequired && !submittedFieldIds.includes(f.id))
+      .map((f) => f.fieldName);
+
+    if (missingRequired.length > 0) {
+      throw new BadRequestException(`Missing required fields: ${missingRequired.join(', ')}`);
+    }
+
+    const validFieldIds = typeFields.map((f) => f.id);
+    const invalidFields = submittedFieldIds.filter((id) => !validFieldIds.includes(id));
+    if (invalidFields.length > 0) {
+      throw new BadRequestException(`Invalid field IDs: ${invalidFields.join(', ')}`);
     }
 
     const request = this.requestRepository.create({
-      ...createRequestDto,
-      fromDate: new Date(fromDate),
-      toDate: new Date(toDate),
-      user: currentUser,
+      requestTypeId: dto.requestTypeId,
       userId: currentUser.id,
+      user: currentUser,
+      fromDate: new Date(dto.fromDate),
+      toDate: new Date(dto.toDate),
+      requestComment: dto.requestComment,
+      attached_files: dto.attached_files ?? [],
       requestStatus: RequestStatus.PENDING,
       comments: [],
-      attached_files: createRequestDto.attached_files ?? [],
     });
 
-    return this.requestRepository.save(request);
+    const saved = await this.requestRepository.save(request);
+
+    const fieldValues = dto.fieldValues.map((fv) =>
+      this.fieldValueRepository.create({
+        requestId: saved.id,
+        fieldId: fv.fieldId,
+        value: fv.value,
+      }),
+    );
+    await this.fieldValueRepository.save(fieldValues);
+
+    const full = await this.requestRepository.findOne({ where: { id: saved.id } });
+    if (!full) throw new NotFoundException('Request not found after save.');
+
+    // Emit event → NotificationListener handles email + SSE
+    this.eventEmitter.emit(REQUEST_EVENTS.CREATED, {
+      requestId: full.id,
+      requestNumber: full.requestNumber,
+      agentEmail: currentUser.email,
+      agentName: `${currentUser.firstName} ${currentUser.lastName}`,
+      requestTypeName: full.requestType?.name ?? dto.requestTypeId,
+      fromDate: full.fromDate,
+      toDate: full.toDate,
+    });
+
+    return full;
   }
 
+  // ─── Admin: Update status ──────────────────────────────────────────────────
 
-  async findByUser(
-    userId: string,
-    filters?: Partial<FilterRequestsDto>,
-  ): Promise<PaginatedResult<Request>> {
+  async updateStatus(id: string, dto: UpdateRequestStatusDto, currentUser: User): Promise<Request> {
+    const request = await this.requestRepository.findOne({ where: { id } });
+    if (!request) throw new NotFoundException(`Request "${id}" not found.`);
 
+    if (request.requestStatus === RequestStatus.ACCEPTED ||
+        request.requestStatus === RequestStatus.REJECTED) {
+      throw new ConflictException(`Request is already closed (${request.requestStatus}).`);
+    }
 
+    request.requestStatus = dto.requestStatus;
+
+    if (dto.adminComment) {
+      const entry = `[ADMIN|${currentUser.id}|${new Date().toISOString()}] ${dto.adminComment}`;
+      request.comments = [...(request.comments ?? []), entry];
+    }
+
+    const saved = await this.requestRepository.save(request);
+
+    // Emit event → agent gets email + SSE
+    this.eventEmitter.emit(REQUEST_EVENTS.STATUS_UPDATED, {
+      requestId: saved.id,
+      requestNumber: saved.requestNumber,
+      agentEmail: saved.user?.email,
+      agentName: `${saved.user?.firstName} ${saved.user?.lastName}`,
+      requestTypeName: saved.requestType?.name ?? '',
+      newStatus: dto.requestStatus,
+      adminComment: dto.adminComment,
+    });
+
+    return saved;
+  }
+
+  // ─── Agent: Confirm ────────────────────────────────────────────────────────
+
+  async comfirmRequest(id: string, currentUser: User): Promise<Request> {
+    const request = await this.requestRepository.findOne({ where: { id } });
+    if (!request) throw new NotFoundException(`Request "${id}" not found.`);
+
+    if (request.userId !== currentUser.id) {
+      throw new ForbiddenException('You can only confirm your own requests.');
+    }
+    if (request.requestStatus !== RequestStatus.ACCEPTED) {
+      throw new BadRequestException('Request must be accepted before it can be confirmed.');
+    }
+
+    request.requestStatus = RequestStatus.CONFIRMED;
+    const saved = await this.requestRepository.save(request);
+
+    // Emit event → admins get SSE + agent gets email
+    this.eventEmitter.emit(REQUEST_EVENTS.CONFIRMED, {
+      requestId: saved.id,
+      requestNumber: saved.requestNumber,
+      agentEmail: currentUser.email,
+      agentName: `${currentUser.firstName} ${currentUser.lastName}`,
+      requestTypeName: saved.requestType?.name ?? '',
+    });
+
+    return saved;
+  }
+
+  // ─── Agent: Get own (paginated) ────────────────────────────────────────────
+
+  async findByUser(userId: string, filters?: FilterRequestsDto): Promise<PaginatedResult<Request>> {
     const qb = this.requestRepository
       .createQueryBuilder('request')
-      .leftJoinAndSelect('request.requestType', 'requestType')
       .where('request.userId = :userId', { userId });
 
     if (filters?.requestStatus) {
-      qb.andWhere('request.requestStatus = :status', {
-        status: filters.requestStatus,
-      });
+      qb.andWhere('request.requestStatus = :status', { status: filters.requestStatus });
     }
-
     if (filters?.dateFrom) {
-      qb.andWhere('request.requestDate >= :dateFrom', {
-        dateFrom: filters.dateFrom,
-      });
+      qb.andWhere('request.requestDate >= :dateFrom', { dateFrom: filters.dateFrom });
     }
-
     if (filters?.dateTo) {
-      qb.andWhere('request.requestDate <= :dateTo', {
-        dateTo: filters.dateTo,
-      });
+      qb.andWhere('request.requestDate <= :dateTo', { dateTo: filters.dateTo });
     }
 
     qb.orderBy('request.requestDate', 'DESC');
-
     const [data, total] = await qb.getManyAndCount();
-
-    if (!data.length) {
-      throw new NotFoundException('No requests found for this user.');
-    }
-
-    return {
-      data,
-      total
-    };
+    return { data, total };
   }
 
-  // ─── Agent: Get single request (ownership enforced) ────────────────────────
+  // ─── Get one ───────────────────────────────────────────────────────────────
 
   async findOne(id: string, currentUser: User): Promise<Request> {
     const request = await this.requestRepository.findOne({ where: { id } });
-
-    if (!request) {
-      throw new NotFoundException(`Request with id "${id}" not found.`);
-    }
-
-    // Agents may only view their own requests; admins can view all
-    if (
-      currentUser.role === UserRole.AGENT &&
-      request.userId !== currentUser.id
-    ) {
+    if (!request) throw new NotFoundException(`Request "${id}" not found.`);
+    if (currentUser.role === UserRole.AGENT && request.userId !== currentUser.id) {
       throw new ForbiddenException('You do not have access to this request.');
     }
-
     return request;
   }
 
-  // ─── Agent: Add a comment ──────────────────────────────────────────────────
-
-  async addComment(
-    id: string,
-    addCommentDto: AddCommentDto,
-    currentUser: User,
-  ): Promise<Request> {
-    const request = await this.findOne(id, currentUser);
-
-    if (request.requestStatus === RequestStatus.ACCEPTED ||
-        request.requestStatus === RequestStatus.REJECTED) {
-      throw new ForbiddenException(
-        'Cannot add comments to a closed request.',
-      );
-    }
-
-    const timestamp = new Date().toISOString();
-    const entry = `[${currentUser.role}|${currentUser.id}|${timestamp}] ${addCommentDto.comment}`;
-
-    request.comments = [...(request.comments ?? []), entry];
-    return this.requestRepository.save(request);
-  }
-
-  // ─── Agent: Add attachments ────────────────────────────────────────────────
-
-  async addAttachments(
-    id: string,
-    addAttachmentsDto: AddAttachmentsDto,
-    currentUser: User,
-  ): Promise<Request> {
-    const request = await this.findOne(id, currentUser);
-
-    if (request.requestStatus === RequestStatus.ACCEPTED ||
-        request.requestStatus === RequestStatus.REJECTED) {
-      throw new ForbiddenException(
-        'Cannot add attachments to a closed request.',
-      );
-    }
-
-    request.attached_files = [
-      ...(request.attached_files ?? []),
-      ...addAttachmentsDto.files,
-    ];
-    return this.requestRepository.save(request);
-  }
-
-  // ─── Admin: Get all requests with filters ─────────────────────────────────
+  // ─── Admin: Get all (paginated + filtered) ─────────────────────────────────
 
   async findAll(filters: FilterRequestsDto): Promise<PaginatedResult<Request>> {
-
     const qb = this.requestRepository
       .createQueryBuilder('request')
       .leftJoinAndSelect('request.user', 'user')
       .leftJoinAndSelect('request.requestType', 'requestType');
 
     if (filters.requestTypeId) {
-      qb.andWhere('request.requestTypeId = :requestTypeId', {
-        requestTypeId: filters.requestTypeId,
-      });
+      qb.andWhere('request.requestTypeId = :requestTypeId', { requestTypeId: filters.requestTypeId });
     }
-
     if (filters.userId) {
       qb.andWhere('request.userId = :userId', { userId: filters.userId });
     }
-
     if (filters.requestStatus) {
-      qb.andWhere('request.requestStatus = :status', {
-        status: filters.requestStatus,
-      });
+      qb.andWhere('request.requestStatus = :status', { status: filters.requestStatus });
     }
-
     if (filters.dateFrom) {
-      qb.andWhere('request.requestDate >= :dateFrom', {
-        dateFrom: filters.dateFrom,
-      });
+      qb.andWhere('request.requestDate >= :dateFrom', { dateFrom: filters.dateFrom });
     }
-
     if (filters.dateTo) {
-      qb.andWhere('request.requestDate <= :dateTo', {
-        dateTo: filters.dateTo,
-      });
+      qb.andWhere('request.requestDate <= :dateTo', { dateTo: filters.dateTo });
     }
 
-    qb.orderBy('request.requestDate', 'DESC')
-
+    qb.orderBy('request.requestDate', 'DESC');
     const [data, total] = await qb.getManyAndCount();
-
-    return {
-      data,
-      total
-    };
+    return { data, total};
   }
 
-  // ─── Admin: Update request status ─────────────────────────────────────────
+  // ─── Agent: Add comment ────────────────────────────────────────────────────
 
-  async updateStatus(
-    id: string,
-    updateDto: UpdateRequestStatusDto,
-    currentUser: User,
-  ): Promise<Request> {
-    const request = await this.requestRepository.findOne({ where: { id } });
-
-    if (!request) {
-      throw new NotFoundException(`Request with id "${id}" not found.`);
-    }
-
+  async addComment(id: string, dto: AddCommentDto, currentUser: User): Promise<Request> {
+    const request = await this.findOne(id, currentUser);
     if (request.requestStatus === RequestStatus.ACCEPTED ||
-        request.requestStatus === RequestStatus.REJECTED) {
-      throw new ConflictException(
-        `Request is already closed with status "${request.requestStatus}".`,
-      );
+        request.requestStatus === RequestStatus.REJECTED ||
+        request.requestStatus === RequestStatus.CONFIRMED) {
+      throw new ForbiddenException('Cannot add comments to a closed request.');
     }
-
-    request.requestStatus = updateDto.requestStatus;
-
-    if (updateDto.adminComment) {
-      const timestamp = new Date().toISOString();
-      const entry = `[ADMIN|${currentUser.id}|${timestamp}] ${updateDto.adminComment}`;
-      request.comments = [...(request.comments ?? []), entry];
-    }
-
+    const entry = `[${currentUser.role}|${currentUser.id}|${new Date().toISOString()}] ${dto.comment}`;
+    request.comments = [...(request.comments ?? []), entry];
     return this.requestRepository.save(request);
   }
 
-  // ─── Admin: Hard-delete a request (super-admin only) ──────────────────────
+  // ─── Agent: Add attachments ────────────────────────────────────────────────
+
+  async addAttachments(id: string, dto: AddAttachmentsDto, currentUser: User): Promise<Request> {
+    const request = await this.findOne(id, currentUser);
+    if (request.requestStatus === RequestStatus.ACCEPTED ||
+        request.requestStatus === RequestStatus.REJECTED ||
+        request.requestStatus === RequestStatus.CONFIRMED) {
+      throw new ForbiddenException('Cannot add attachments to a closed request.');
+    }
+    request.attached_files = [...(request.attached_files ?? []), ...dto.files];
+    return this.requestRepository.save(request);
+  }
+
+  // ─── Admin: Delete ─────────────────────────────────────────────────────────
 
   async remove(id: string): Promise<{ message: string }> {
     const request = await this.requestRepository.findOne({ where: { id } });
-
-    if (!request) {
-      throw new NotFoundException(`Request with id "${id}" not found.`);
-    }
-
+    if (!request) throw new NotFoundException(`Request "${id}" not found.`);
     await this.requestRepository.remove(request);
-    return { message: `Request ${id} has been deleted.` };
+    return { message: `Request ${id} deleted.` };
   }
 
-  // ─── Agent dashboard stats ─────────────────────────────────────────────────
+  // ─── Agent stats ───────────────────────────────────────────────────────────
 
   async getAgentStats(userId: string): Promise<DashboardStats> {
     const rows = await this.requestRepository
@@ -295,11 +297,10 @@ export class RequestService {
       .where('r.userId = :userId', { userId })
       .groupBy('r.requestStatus')
       .getRawMany<{ status: string; count: string }>();
-
     return this.aggregateStats(rows);
   }
 
-  // ─── Admin dashboard stats ─────────────────────────────────────────────────
+  // ─── Admin stats ───────────────────────────────────────────────────────────
 
   async getAdminStats(): Promise<AdminDashboardStats> {
     const statusRows = await this.requestRepository
@@ -326,44 +327,21 @@ export class RequestService {
     };
   }
 
-  // ─── Private helpers ───────────────────────────────────────────────────────
-
-  private aggregateStats(
-    rows: { status: string; count: string }[],
-  ): DashboardStats {
+  private aggregateStats(rows: { status: string; count: string }[]): DashboardStats {
     const map: Record<string, number> = {};
     let total = 0;
-
     for (const row of rows) {
       const n = parseInt(row.count, 10);
       map[row.status] = n;
       total += n;
     }
-
     return {
       total,
-      pending: map[RequestStatus.PENDING] ?? 0,
+      pending:    map[RequestStatus.PENDING]     ?? 0,
       inProgress: map[RequestStatus.IN_PROGRESS] ?? 0,
-      accepted: map[RequestStatus.ACCEPTED] ?? 0,
-      rejected: map[RequestStatus.REJECTED] ?? 0,
+      accepted:   map[RequestStatus.ACCEPTED]    ?? 0,
+      rejected:   map[RequestStatus.REJECTED]    ?? 0,
+      confirmed:  map[RequestStatus.CONFIRMED]   ?? 0,
     };
-  }
-  async comfirmRequest(id: string, currentUser : User): Promise<Request>{
-    const request = await this.requestRepository.findOne({ where: { id } });
-
-  if (!request) {
-    throw new NotFoundException(`Request with id "${id}" not found.`);
-  }
-  if (request.userId !== currentUser.id) {
-    throw new ForbiddenException('You can only confirm your own requests.');
-  }
-
-  if (request.requestStatus !== RequestStatus.ACCEPTED) {
-    throw new BadRequestException('Request must be accepted before it can be confirmed.');
-  }
-
-  request.requestStatus = RequestStatus.COMFIRMED;
-  return this.requestRepository.save(request);
-
   }
 }
