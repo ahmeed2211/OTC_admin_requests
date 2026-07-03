@@ -13,7 +13,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login – returns a JWT access token' })
+  @ApiOperation({ summary: 'Login' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }

@@ -18,7 +18,7 @@ export class NotificationController {
   constructor(private readonly sseService: SseService) {}
 
   @Sse('stream')
-  @ApiOperation({ summary: '[Any] SSE stream – connect once to receive real-time notifications' })
+  @ApiOperation({ summary: '[Any] SSE stream' })
   stream(@CurrentUser() currentUser: User): Observable<MessageEvent> {
     const subject = this.sseService.getOrCreateStream(currentUser.id);
 

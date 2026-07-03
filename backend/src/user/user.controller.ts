@@ -73,7 +73,7 @@ export class UserController {
 
   @Patch(':id/reset-password')
   @Roles(UserRole.AGENT)
-  @ApiOperation({ summary: '[SuperAdmin] Reset a user password' }) // a user can change their password 
+  @ApiOperation({ summary: '[SuperAdmin] Reset a user password' })
   resetPassword(
     @Param('id') id: string,
     @Body('password') oldpassword: string,

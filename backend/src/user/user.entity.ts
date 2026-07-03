@@ -42,7 +42,8 @@ export class User{
     @Column({unique: true, nullable: false})
     phonenumber : string;
     @ApiProperty() 
-    @Column({ nullable: true }) department: string;
+    @Column({ nullable: true }) 
+    department: string;
 
 
 }

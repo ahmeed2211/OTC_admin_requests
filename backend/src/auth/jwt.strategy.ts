@@ -6,7 +6,7 @@ import { Repository } from 'typeorm';
 import { User } from '../user/user.entity';
 
 export interface JwtPayload {
-  sub: string;   // user id
+  sub: string;  
   email: string;
   role: string;
 }
@@ -28,6 +28,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive.');
     }
-    return user; // attached as request.user
+    return user;
   }
 }

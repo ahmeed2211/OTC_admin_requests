@@ -8,6 +8,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from '../common/enums';
 import { User } from './user.entity';
+import {UnauthorizedException}from '@nestjs/common';
 @Injectable()
 export class UserService {
     constructor(
@@ -67,14 +68,17 @@ export class UserService {
         return this.userRepository.save(user);
 
     }
-    async resetPassword(id: string,oldpassword: string,  newPassword: string): Promise<{ message: string }> {
-    const user = await this.findOne(id);
-    if (!user) {
-            throw new NotFoundException('User not found');
-        }
+    async resetPassword(id: string, oldPassword: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found.');
+
+    const match = await bcrypt.compare(oldPassword, user.password);
+    if (!match) throw new UnauthorizedException('Current password is incorrect.');
+
     const salt = await bcrypt.genSalt();
     user.password = await bcrypt.hash(newPassword, salt);
     await this.userRepository.save(user);
-    return { message: 'Password reset successfully' };
-  }
+
+    return { message: 'Password reset successfully.' };
+    }
 }

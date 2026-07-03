@@ -25,10 +25,6 @@ import { User } from '../user/user.entity';
 export class RequestController {
   constructor(private readonly requestService: RequestService) {}
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // AGENT
-  // ══════════════════════════════════════════════════════════════════════════
-
   @Post()
   @Roles(UserRole.AGENT)
   @HttpCode(HttpStatus.CREATED)
@@ -94,14 +90,9 @@ export class RequestController {
   confirmRequest(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() currentUser: User) {
     return this.requestService.comfirmRequest(id, currentUser);
   }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // ADMIN
-  // ══════════════════════════════════════════════════════════════════════════
-
   @Get()
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: '[Admin] Get all requests – filter by type, agent, date, status' })
+  @ApiOperation({ summary: '[Admin] Get all requests filter by type, agent, date, status' })
   findAll(@Query() filters: FilterRequestsDto) {
     return this.requestService.findAll(filters);
   }
