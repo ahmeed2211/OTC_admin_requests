@@ -3,8 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, UpdateDateColumn, CreateDateColumn } from 'typeorm';
 import {Request} from "../request/request.entity";
 import { UserRole } from '../common/enums';
-import { IsEnum } from 'class-validator/types/decorator/typechecker/IsEnum';
-import { IsOptional } from 'class-validator';
+import { Exclude } from 'class-transformer';
 
 @Entity("Users")
 export class User{
@@ -20,6 +19,7 @@ export class User{
     @ApiProperty({ description: 'User email' })
     email: string;
     @Column()
+    @Exclude()
     password: string;
     @Column({ type: 'enum', enum: UserRole, default: UserRole.AGENT})
     @ApiProperty({ enum: UserRole, default: UserRole.AGENT })  

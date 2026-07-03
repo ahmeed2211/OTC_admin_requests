@@ -1,7 +1,9 @@
 import api from './axios.config';
-
-export const login = (email: string, password: string) =>
-  api.post('/auth/login', { email, password });
-
-export const changePassword = (currentPassword: string, newPassword: string) =>
-  api.post('/auth/change-password', { currentPassword, newPassword });
+import { LoginDto, LoginResponse, ChangePasswordDto } from '../types/auth.types';
+ 
+export const login = (dto: LoginDto): Promise<{ data: LoginResponse }> =>
+  api.post('/auth/login', dto);
+ 
+export const changePassword = (dto: ChangePasswordDto): Promise<{ data: { message: string } }> =>
+  api.post('/auth/change-password', dto);
+ 

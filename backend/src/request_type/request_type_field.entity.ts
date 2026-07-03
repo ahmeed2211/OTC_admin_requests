@@ -5,11 +5,11 @@ import {
 import { RequestType } from './request_type.entity';
 
 export enum FieldType {
-  TEXT     = 'text',
-  NUMBER   = 'number',
-  DATE     = 'date',
-  BOOLEAN  = 'boolean',
-  FILE     = 'file',
+  TEXT  = 'text',
+  NUMBER = 'number',
+  DATE = 'date',
+  BOOLEAN= 'boolean',
+  FILE = 'file',
 }
 
 @Entity('RequestTypeFields')

@@ -44,10 +44,10 @@ export class Request {
   @Column({ type: 'simple-array', nullable: true })
   comments: string[];
 
-  @Column({ nullable: false })
+  @Column({ nullable: true })
   fromDate: Date;
 
-  @Column({ nullable: false })
+  @Column({ nullable: true })
   toDate: Date;
 
   @OneToMany(() => RequestFieldValue, (fv) => fv.request, {

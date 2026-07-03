@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ClassSerializerInterceptor } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -8,6 +10,7 @@ async function bootstrap() {
     origin: process.env.APP_CORS_ORIGIN?.split(','),
     credentials: true,
   });
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   const options = new DocumentBuilder()
     .setTitle('API')
     .setDescription('API docs')

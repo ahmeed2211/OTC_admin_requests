@@ -6,7 +6,6 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RequestStatus } from '../common/enums';
-
 export class FieldValueDto {
   @ApiProperty({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' })
   @IsUUID()
@@ -26,12 +25,12 @@ export class CreateRequestDto {
 
   @ApiProperty({ example: '2025-07-01' })
   @IsDateString()
-  @IsNotEmpty()
+  @IsOptional()
   fromDate: string;
 
   @ApiProperty({ example: '2025-07-10' })
   @IsDateString()
-  @IsNotEmpty()
+  @IsOptional()
   toDate: string;
 
   @ApiPropertyOptional({ example: 'Additional context.', maxLength: 1000 })
@@ -80,9 +79,6 @@ export class AddAttachmentsDto {
   @IsNotEmpty()
   files: string[];
 }
-
-// ─── Filter / paginate (Admin) ─────────────────────────────────────────────────
-
 export class FilterRequestsDto {
   @ApiPropertyOptional({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' })
   @IsOptional()

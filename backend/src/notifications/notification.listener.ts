@@ -63,7 +63,6 @@ export class NotificationListener {
   }
   @OnEvent(REQUEST_EVENTS.CONFIRMED)
   async handleConfirmed(payload: RequestConfirmedEvent) {
-    // Email agent
     await this.mailService.sendConfirmed(
       payload.agentEmail,
       payload.agentName,

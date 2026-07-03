@@ -45,10 +45,8 @@ export class RequestService {
     private readonly fieldRepository: Repository<RequestTypeField>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
-
-  // ─── Agent: Create request ─────────────────────────────────────────────────
-
   async createRequest(dto: CreateRequestDto, currentUser: User): Promise<Request> {
+     if (dto.fromDate && dto.toDate) {
     if (new Date(dto.fromDate) >= new Date(dto.toDate)) {
       throw new BadRequestException('fromDate must be strictly before toDate.');
     }
@@ -67,7 +65,7 @@ export class RequestService {
     if (overlapping) {
       throw new ConflictException('You already have an active request of this type overlapping the requested period.');
     }
-
+  }
     const typeFields = await this.fieldRepository.find({
       where: { requestTypeId: dto.requestTypeId },
     });
@@ -88,16 +86,16 @@ export class RequestService {
     }
 
     const request = this.requestRepository.create({
-      requestTypeId: dto.requestTypeId,
-      userId: currentUser.id,
-      user: currentUser,
-      fromDate: new Date(dto.fromDate),
-      toDate: new Date(dto.toDate),
-      requestComment: dto.requestComment,
-      attached_files: dto.attached_files ?? [],
-      requestStatus: RequestStatus.PENDING,
-      comments: [],
-    });
+    requestTypeId: dto.requestTypeId,
+    userId: currentUser.id,
+    user: currentUser,
+    fromDate: dto.fromDate ? new Date(dto.fromDate) : undefined,
+    toDate: dto.toDate ? new Date(dto.toDate) : undefined,
+    requestComment: dto.requestComment,
+    attached_files: dto.attached_files ?? [],
+    requestStatus: RequestStatus.PENDING,
+    comments: [],
+  });
 
     const saved = await this.requestRepository.save(request);
 
@@ -112,8 +110,6 @@ export class RequestService {
 
     const full = await this.requestRepository.findOne({ where: { id: saved.id } });
     if (!full) throw new NotFoundException('Request not found after save.');
-
-    // Emit event → NotificationListener handles email + SSE
     this.eventEmitter.emit(REQUEST_EVENTS.CREATED, {
       requestId: full.id,
       requestNumber: full.requestNumber,
@@ -126,8 +122,6 @@ export class RequestService {
 
     return full;
   }
-
-  // ─── Admin: Update status ──────────────────────────────────────────────────
 
   async updateStatus(id: string, dto: UpdateRequestStatusDto, currentUser: User): Promise<Request> {
     const request = await this.requestRepository.findOne({ where: { id } });
@@ -146,8 +140,6 @@ export class RequestService {
     }
 
     const saved = await this.requestRepository.save(request);
-
-    // Emit event → agent gets email + SSE
     this.eventEmitter.emit(REQUEST_EVENTS.STATUS_UPDATED, {
       requestId: saved.id,
       requestNumber: saved.requestNumber,
@@ -160,8 +152,6 @@ export class RequestService {
 
     return saved;
   }
-
-  // ─── Agent: Confirm ────────────────────────────────────────────────────────
 
   async comfirmRequest(id: string, currentUser: User): Promise<Request> {
     const request = await this.requestRepository.findOne({ where: { id } });
@@ -176,8 +166,6 @@ export class RequestService {
 
     request.requestStatus = RequestStatus.CONFIRMED;
     const saved = await this.requestRepository.save(request);
-
-    // Emit event → admins get SSE + agent gets email
     this.eventEmitter.emit(REQUEST_EVENTS.CONFIRMED, {
       requestId: saved.id,
       requestNumber: saved.requestNumber,
@@ -188,8 +176,6 @@ export class RequestService {
 
     return saved;
   }
-
-  // ─── Agent: Get own (paginated) ────────────────────────────────────────────
 
   async findByUser(userId: string, filters?: FilterRequestsDto): Promise<PaginatedResult<Request>> {
     const qb = this.requestRepository
@@ -211,8 +197,6 @@ export class RequestService {
     return { data, total };
   }
 
-  // ─── Get one ───────────────────────────────────────────────────────────────
-
   async findOne(id: string, currentUser: User): Promise<Request> {
     const request = await this.requestRepository.findOne({ where: { id } });
     if (!request) throw new NotFoundException(`Request "${id}" not found.`);
@@ -221,8 +205,6 @@ export class RequestService {
     }
     return request;
   }
-
-  // ─── Admin: Get all (paginated + filtered) ─────────────────────────────────
 
   async findAll(filters: FilterRequestsDto): Promise<PaginatedResult<Request>> {
     const qb = this.requestRepository
@@ -251,8 +233,6 @@ export class RequestService {
     return { data, total};
   }
 
-  // ─── Agent: Add comment ────────────────────────────────────────────────────
-
   async addComment(id: string, dto: AddCommentDto, currentUser: User): Promise<Request> {
     const request = await this.findOne(id, currentUser);
     if (request.requestStatus === RequestStatus.ACCEPTED ||
@@ -265,8 +245,6 @@ export class RequestService {
     return this.requestRepository.save(request);
   }
 
-  // ─── Agent: Add attachments ────────────────────────────────────────────────
-
   async addAttachments(id: string, dto: AddAttachmentsDto, currentUser: User): Promise<Request> {
     const request = await this.findOne(id, currentUser);
     if (request.requestStatus === RequestStatus.ACCEPTED ||
@@ -277,17 +255,12 @@ export class RequestService {
     request.attached_files = [...(request.attached_files ?? []), ...dto.files];
     return this.requestRepository.save(request);
   }
-
-  // ─── Admin: Delete ─────────────────────────────────────────────────────────
-
   async remove(id: string): Promise<{ message: string }> {
     const request = await this.requestRepository.findOne({ where: { id } });
     if (!request) throw new NotFoundException(`Request "${id}" not found.`);
     await this.requestRepository.remove(request);
     return { message: `Request ${id} deleted.` };
   }
-
-  // ─── Agent stats ───────────────────────────────────────────────────────────
 
   async getAgentStats(userId: string): Promise<DashboardStats> {
     const rows = await this.requestRepository
@@ -299,8 +272,6 @@ export class RequestService {
       .getRawMany<{ status: string; count: string }>();
     return this.aggregateStats(rows);
   }
-
-  // ─── Admin stats ───────────────────────────────────────────────────────────
 
   async getAdminStats(): Promise<AdminDashboardStats> {
     const statusRows = await this.requestRepository
