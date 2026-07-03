@@ -1,11 +1,8 @@
-// src/types/user.types.ts
-
 export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
   AGENT = 'AGENT',
 }
-
 export interface User {
   id: string;
   firstName: string;
@@ -19,7 +16,6 @@ export interface User {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface CreateUserDto {
   firstName: string;
   lastName: string;
@@ -29,7 +25,6 @@ export interface CreateUserDto {
   department: string;
   role: UserRole;
 }
-
 export interface UpdateUserDto {
   firstName?: string;
   lastName?: string;

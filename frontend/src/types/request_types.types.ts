@@ -1,5 +1,3 @@
-// src/types/request_type.types.ts
-
 export enum FieldType {
   TEXT = 'text',
   NUMBER = 'number',
