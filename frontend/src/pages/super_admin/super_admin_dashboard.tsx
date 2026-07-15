@@ -1,5 +1,3 @@
-// src/pages/super_admin/super_admin_dashboard.tsx
-
 import { JSX, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

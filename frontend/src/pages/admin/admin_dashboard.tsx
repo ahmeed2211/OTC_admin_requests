@@ -1,5 +1,3 @@
-// src/pages/admin/admin_requests_page.tsx
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
