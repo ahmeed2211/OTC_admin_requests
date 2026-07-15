@@ -6,8 +6,6 @@ import {
 import { Type } from 'class-transformer';
 import { FieldType } from './request_type_field.entity';
 
-// ─── Single field definition ───────────────────────────────────────────────
-
 export class CreateFieldDto {
   @ApiProperty({ example: 'destination' })
   @IsString()

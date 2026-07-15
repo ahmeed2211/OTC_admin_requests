@@ -4,8 +4,6 @@ export interface RequestCreatedEvent {
   agentEmail: string;
   agentName: string;
   requestTypeName: string;
-  fromDate: Date;
-  toDate: Date;
 }
 
 export interface RequestStatusUpdatedEvent {

@@ -5,10 +5,13 @@ export enum UserRole {
 }
 
 export enum RequestStatus {
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
   ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
   CONFIRMED = 'CONFIRMED',
 }
 
@@ -16,4 +19,15 @@ export enum NotificationType {
   REQUEST_CREATED = 'REQUEST_CREATED',
   REQUEST_STATUS_CHANGED = 'REQUEST_STATUS_CHANGED',
   COMMENT_ADDED = 'COMMENT_ADDED',
+}
+
+export enum  AuditAction{
+  CREATE = 'CREATE',
+  UPDATE = 'UPDATE',
+  DELETE = 'DELETE',
+  LOGIN = 'LOGIN',
+  LOGOUT = 'LOGOUT',
+  UPLOAD = 'UPLOAD',
+  DOWNLOAD = 'DOWNLOAD',
+  VIEW = 'VIEW',
 }

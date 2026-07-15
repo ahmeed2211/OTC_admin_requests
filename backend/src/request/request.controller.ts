@@ -17,6 +17,20 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { User } from '../user/user.entity';
+import {
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
+import { attachmentStorage } from '../common/multer.config'
+
+import {
+  FilesInterceptor,
+} from '@nestjs/platform-express';
+
+import {
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 
 @ApiTags('Requests')
 @ApiBearerAuth()
@@ -24,14 +38,45 @@ import { User } from '../user/user.entity';
 @Controller('requests')
 export class RequestController {
   constructor(private readonly requestService: RequestService) {}
-
-  @Post()
-  @Roles(UserRole.AGENT)
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: '[Agent] Submit a new administrative request' })
-  @ApiCreatedResponse({ description: 'Request created successfully.' })
-  create(@Body() dto: CreateRequestDto, @CurrentUser() currentUser: User) {
-    return this.requestService.createRequest(dto, currentUser);
+@Post()
+@Roles(UserRole.AGENT)
+@UseInterceptors(FilesInterceptor('files', 10, { storage: attachmentStorage }))
+@HttpCode(HttpStatus.CREATED)
+@ApiConsumes('multipart/form-data')
+@ApiOperation({ summary: '[Agent] Submit a new administrative request' })
+@ApiCreatedResponse({ description: 'Request created successfully.' })
+@ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        requestTypeId: {
+          type: 'string',
+          format: 'uuid',
+        },
+        requestComment: {
+          type: 'string',
+        },
+        fieldValues: {
+          type: 'string',
+          description: 'JSON stringified array of field values',
+        },
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    },
+  })
+  create(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() dto: CreateRequestDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    console.log('Received files:', files);
+    return this.requestService.createRequest(dto, files, currentUser);
   }
 
   @Get('my')
@@ -71,17 +116,32 @@ export class RequestController {
 
   @Post(':id/attachments')
   @Roles(UserRole.AGENT)
+  @UseInterceptors(FilesInterceptor('files', 10,{ storage: attachmentStorage }))
   @HttpCode(HttpStatus.OK)
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: '[Agent] Attach files to an open request' })
   @ApiParam({ name: 'id', type: String })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    },
+  })
   addAttachments(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: AddAttachmentsDto,
+    @UploadedFiles() files: Express.Multer.File[],
     @CurrentUser() currentUser: User,
   ) {
-    return this.requestService.addAttachments(id, dto, currentUser);
+    return this.requestService.addAttachments(id, files, currentUser);
   }
-
   @Patch(':id/confirm')
   @Roles(UserRole.AGENT)
   @ApiOperation({ summary: '[Agent] Confirm an accepted request' })

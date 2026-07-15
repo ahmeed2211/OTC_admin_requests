@@ -2,12 +2,16 @@ import { User } from './user.types';
 import { RequestType, RequestTypeField } from './request_types.types';
 
 export enum RequestStatus {
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
   ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
   CONFIRMED = 'CONFIRMED',
 }
+
 
 export interface RequestFieldValue {
   id: string;
@@ -15,6 +19,18 @@ export interface RequestFieldValue {
   value: string;
   requestId: string;
   field: RequestTypeField;
+}
+
+export interface Attachment {
+  id: string;
+  file_name: string;
+  file_path: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_by: string;
+  uploader?: User;
+  request_id: string;
+  created_at: string;
 }
 
 export interface Request {
@@ -27,10 +43,8 @@ export interface Request {
   requestStatus: RequestStatus;
   requestDate: string;
   requestComment: string;
-  attached_files: string[];
+  attachments: Attachment[];
   comments: string[];
-  fromDate: string;
-  toDate: string;
   fieldValues: RequestFieldValue[];
 }
 
@@ -38,13 +52,9 @@ export interface FieldValueDto {
   fieldId: string;
   value: string;
 }
-
 export interface CreateRequestDto {
   requestTypeId: string;
-  fromDate: string;
-  toDate: string;
   requestComment?: string;
-  attached_files?: string[];
   fieldValues: FieldValueDto[];
 }
 
@@ -55,10 +65,6 @@ export interface UpdateRequestStatusDto {
 
 export interface AddCommentDto {
   comment: string;
-}
-
-export interface AddAttachmentsDto {
-  files: string[];
 }
 
 export interface FilterRequestsDto {
@@ -89,4 +95,25 @@ export interface DashboardStats {
 
 export interface AdminDashboardStats extends DashboardStats {
   byType: { typeName: string; count: number }[];
+}
+
+export interface RequestHistory{
+  id : string;
+  requestId : string;
+  oldStatus : string | null;
+  newStatus : string;
+  changedBy : string;
+  comment? : string;
+  changedAt : string;
+}
+export interface RequestHistoryFilters{
+  id:string;
+  requestId?: string;
+  userId?: string;
+  oldStatus?: string;
+  newStatus?: string;
+  changedBy?: string;
+  comment?: string;
+  changedAtFrom?: string;
+  changedAtTo?: string;
 }

@@ -45,6 +45,13 @@ export class UserController {
   findAll(@Query('role') role?: UserRole) {
     return this.userService.findAll(role);
   }
+  @Get(':id')
+  @ApiOperation({ summary: '[SuperAdmin] Get user by ID' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  getUserById(@Param('id') id: string) {
+    return this.userService.getUserById(id);
+  }
+
 
   @Get(':value')
   @ApiOperation({ summary: '[SuperAdmin] Find user by id, name, email, or phone' })

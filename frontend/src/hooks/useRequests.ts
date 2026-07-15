@@ -1,5 +1,3 @@
-// src/hooks/useRequests.ts
-
 import { useState, useCallback } from 'react';
 import {
   createRequest as createRequestApi,
@@ -14,17 +12,19 @@ import {
   addComment as addCommentApi,
   addAttachments as addAttachmentsApi,
   deleteRequest as deleteRequestApi,
+  getRequestHistory as getRequestHistoryApi,
 } from '../api/requests.api';
 import {
   Request,
   CreateRequestDto,
   UpdateRequestStatusDto,
   AddCommentDto,
-  AddAttachmentsDto,
   FilterRequestsDto,
   PaginatedResult,
   DashboardStats,
   AdminDashboardStats,
+  RequestHistoryFilters,
+  RequestHistory,
 } from '../types/request.types';
 
 export const useRequests = () => {
@@ -45,8 +45,10 @@ export const useRequests = () => {
       setLoading(false);
     }
   };
+
   const createRequest = useCallback(
-    (dto: CreateRequestDto) => handle<Request>(() => createRequestApi(dto)),
+    (dto: CreateRequestDto, files?: File[]) =>
+      handle<Request>(() => createRequestApi(dto, files)),
     [],
   );
 
@@ -78,8 +80,8 @@ export const useRequests = () => {
   );
 
   const addAttachments = useCallback(
-    (id: string, dto: AddAttachmentsDto) =>
-      handle<Request>(() => addAttachmentsApi(id, dto)),
+    (id: string, files: File[]) =>
+      handle<Request>(() => addAttachmentsApi(id, files)),
     [],
   );
 
@@ -104,16 +106,20 @@ export const useRequests = () => {
       handle<Request>(() => updateRequestStatusApi(id, dto)),
     [],
   );
-  
+
   const deleteRequest = useCallback(
     (id: string) => handle<{ message: string }>(() => deleteRequestApi(id)),
     [],
   );
-
+  
+  const getRequestHistory = useCallback(
+    (filters?: RequestHistoryFilters) =>
+      handle<RequestHistory[]>(() => getRequestHistoryApi(filters)),
+    [],
+  );
   return {
     loading,
     error,
-    // Agent
     createRequest,
     getMyRequests,
     getMyRequestById,
@@ -121,12 +127,11 @@ export const useRequests = () => {
     confirmRequest,
     addComment,
     addAttachments,
-    // Admin
     getAllRequests,
     getRequestById,
     getAdminStats,
     updateRequestStatus,
-    // Super Admin
     deleteRequest,
+    getRequestHistory,
   };
 };

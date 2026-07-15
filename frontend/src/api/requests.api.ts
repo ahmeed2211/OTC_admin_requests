@@ -3,16 +3,32 @@ import {
   CreateRequestDto,
   UpdateRequestStatusDto,
   AddCommentDto,
-  AddAttachmentsDto,
   FilterRequestsDto,
   Request,
   PaginatedResult,
   DashboardStats,
   AdminDashboardStats,
+  RequestHistory,
+  RequestHistoryFilters,
 } from '../types/request.types';
 
-export const createRequest = (dto: CreateRequestDto): Promise<{ data: Request }> =>
-  api.post('/requests', dto);
+
+export const createRequest = (
+  dto: CreateRequestDto,
+  files?: File[],
+): Promise<{ data: Request }> => {
+  const formData = new FormData();
+  formData.append('requestTypeId', dto.requestTypeId);
+  if (dto.requestComment) {
+    formData.append('requestComment', dto.requestComment);
+  }
+  formData.append('fieldValues', JSON.stringify(dto.fieldValues));
+  files?.forEach((file) => formData.append('files', file));
+
+  return api.post('/requests', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
 
 export const getMyRequests = (
   filters?: FilterRequestsDto,
@@ -36,10 +52,15 @@ export const addComment = (
 
 export const addAttachments = (
   id: string,
-  dto: AddAttachmentsDto,
-): Promise<{ data: Request }> =>
-  api.post(`/requests/${id}/attachments`, dto);
+  files: File[],
+): Promise<{ data: Request }> => {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('files', file));
 
+  return api.post(`/requests/${id}/attachments`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
 
 export const getAllRequests = (
   filters?: FilterRequestsDto,
@@ -58,4 +79,8 @@ export const updateRequestStatus = (
 ): Promise<{ data: Request }> =>
   api.patch(`/requests/${id}/status`, dto);
 
-export const deleteRequest = (id: string): Promise<{ data: { message: string } }> =>  api.delete(`/requests/${id}`);
+export const deleteRequest = (id: string): Promise<{ data: { message: string } }> =>
+  api.delete(`/requests/${id}`);
+
+export const getRequestHistory =(filters?: RequestHistoryFilters) : Promise<{ data: RequestHistory[] }> =>
+  api.get(`/requests/my`, { params: filters });

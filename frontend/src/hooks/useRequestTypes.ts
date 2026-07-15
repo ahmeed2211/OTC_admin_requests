@@ -1,5 +1,3 @@
-// src/hooks/useRequestTypes.ts
-
 import { useState, useCallback } from 'react';
 import {
   getRequestTypes as getRequestTypesApi,

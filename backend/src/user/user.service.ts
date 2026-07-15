@@ -36,18 +36,22 @@ export class UserService {
         return users;
     }
     async findOne(value: string | number): Promise<User | null> {
-          return this.userRepository
-            .createQueryBuilder('user')
-            .where('LOWER(user.name) LIKE LOWER(:search)', { search: `%${value}%` })
-            .orWhere('LOWER(user.lastName) LIKE LOWER(:search)', { search: `%${value}%` })
-            .orWhere('LOWER(user.email) LIKE LOWER(:search)', { search: `%${value}%` })
-            .orWhere('LOWER(user.phonenumber) LIKE LOWER(:search)', { search: `%${value}%` })
-            .getOne();
-        }
+    return this.userRepository
+        .createQueryBuilder('user')
+        .where('LOWER(user.firstName) LIKE LOWER(:search)', { search: `%${value}%` })
+        .orWhere('LOWER(user.lastName) LIKE LOWER(:search)', { search: `%${value}%` })
+        .orWhere('LOWER(user.email) LIKE LOWER(:search)', { search: `%${value}%` })
+        .orWhere('LOWER(user.phonenumber) LIKE LOWER(:search)', { search: `%${value}%` })
+        .getOne();
+    }
     async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+    
         const user = await this.userRepository.findOne({where:{id }});
         if (!user) {
             throw new NotFoundException('User not found');
+        }
+        if(user.role == UserRole.SUPER_ADMIN ){
+            throw new ConflictException('Cannot alter another super admin');
         }
         Object.assign(user, updateUserDto);
         return this.userRepository.save(user);
@@ -57,21 +61,23 @@ export class UserService {
          if (!user) {
             throw new NotFoundException('User not found');
         }
+        if(user.role == UserRole.SUPER_ADMIN ){
+            throw new ConflictException('Cannot alter another super admin');
+        }
         await this.userRepository.remove(user);
     }
-    async toggleActivate(id : string) : Promise<User> {
-        const user = await this.findOne(id);
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
-        user.isActive = !user.isActive;
-        return this.userRepository.save(user);
-
+    async toggleActivate(id: string): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found.');
+    user.isActive = !user.isActive;
+    return this.userRepository.save(user);
     }
     async resetPassword(id: string, oldPassword: string, newPassword: string): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found.');
-
+    if(user.role == UserRole.SUPER_ADMIN ){
+            throw new ConflictException('Cannot alter another super admin');
+        }
     const match = await bcrypt.compare(oldPassword, user.password);
     if (!match) throw new UnauthorizedException('Current password is incorrect.');
 
@@ -81,4 +87,11 @@ export class UserService {
 
     return { message: 'Password reset successfully.' };
     }
+    async getUserById(id: string) {
+        const user = await this.userRepository.findOne({
+            where: { id },
+        });
+
+        return user;
+        }
 }

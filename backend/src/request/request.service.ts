@@ -15,7 +15,11 @@ import {
 import { RequestStatus, UserRole } from '../common/enums';
 import { User } from '../user/user.entity';
 import { REQUEST_EVENTS } from '../request/request.events';
-
+import { RequestHistoryService } from './request_history.service';
+import { AuditLogService } from '../user/audit_log.service';
+import { AuditAction } from '../common/enums';
+import { AttachmentService } from './attachment.service';
+ 
 export interface PaginatedResult<T> {
   data: T[];
   total: number;
@@ -43,85 +47,126 @@ export class RequestService {
     private readonly fieldValueRepository: Repository<RequestFieldValue>,
     @InjectRepository(RequestTypeField)
     private readonly fieldRepository: Repository<RequestTypeField>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly attachmentService: AttachmentService,
+    private readonly historyService: RequestHistoryService, 
+    private readonly auditLogService: AuditLogService,  
     private readonly eventEmitter: EventEmitter2,
   ) {}
-  async createRequest(dto: CreateRequestDto, currentUser: User): Promise<Request> {
-     if (dto.fromDate && dto.toDate) {
-    if (new Date(dto.fromDate) >= new Date(dto.toDate)) {
-      throw new BadRequestException('fromDate must be strictly before toDate.');
-    }
+  async createRequest(
+  dto: CreateRequestDto,
+  files: Express.Multer.File[],
+  currentUser: User,
+): Promise<Request> {
 
-    const overlapping = await this.requestRepository
-      .createQueryBuilder('r')
-      .where('r.userId = :userId', { userId: currentUser.id })
-      .andWhere('r.requestTypeId = :requestTypeId', { requestTypeId: dto.requestTypeId })
-      .andWhere('r.requestStatus IN (:...active)', {
-        active: [RequestStatus.PENDING, RequestStatus.IN_PROGRESS],
-      })
-      .andWhere('r.fromDate <= :toDate', { toDate: dto.toDate })
-      .andWhere('r.toDate >= :fromDate', { fromDate: dto.fromDate })
-      .getOne();
-
-    if (overlapping) {
-      throw new ConflictException('You already have an active request of this type overlapping the requested period.');
-    }
+  if (typeof dto.fieldValues === 'string') {
+    dto.fieldValues = JSON.parse(dto.fieldValues);
   }
-    const typeFields = await this.fieldRepository.find({
-      where: { requestTypeId: dto.requestTypeId },
-    });
 
-    const submittedFieldIds = dto.fieldValues.map((fv) => fv.fieldId);
-    const missingRequired = typeFields
-      .filter((f) => f.isRequired && !submittedFieldIds.includes(f.id))
-      .map((f) => f.fieldName);
+  const typeFields = await this.fieldRepository.find({
+    where: { requestTypeId: dto.requestTypeId },
+  });
 
-    if (missingRequired.length > 0) {
-      throw new BadRequestException(`Missing required fields: ${missingRequired.join(', ')}`);
-    }
+  const submittedFieldIds = dto.fieldValues.map((fv) => fv.fieldId);
 
-    const validFieldIds = typeFields.map((f) => f.id);
-    const invalidFields = submittedFieldIds.filter((id) => !validFieldIds.includes(id));
-    if (invalidFields.length > 0) {
-      throw new BadRequestException(`Invalid field IDs: ${invalidFields.join(', ')}`);
-    }
+  const missingRequired = typeFields
+    .filter((f) => f.isRequired && !submittedFieldIds.includes(f.id))
+    .map((f) => f.fieldName);
 
-    const request = this.requestRepository.create({
+  if (missingRequired.length > 0) {
+    throw new BadRequestException(
+      `Missing required fields: ${missingRequired.join(', ')}`
+    );
+  }
+
+  const validFieldIds = typeFields.map((f) => f.id);
+
+  const invalidFields = submittedFieldIds.filter(
+    (id) => !validFieldIds.includes(id)
+  );
+
+  if (invalidFields.length > 0) {
+    throw new BadRequestException(
+      `Invalid field IDs: ${invalidFields.join(', ')}`
+    );
+  }
+
+  const request = this.requestRepository.create({
     requestTypeId: dto.requestTypeId,
     userId: currentUser.id,
     user: currentUser,
-    fromDate: dto.fromDate ? new Date(dto.fromDate) : undefined,
-    toDate: dto.toDate ? new Date(dto.toDate) : undefined,
     requestComment: dto.requestComment,
-    attached_files: dto.attached_files ?? [],
     requestStatus: RequestStatus.PENDING,
     comments: [],
   });
 
-    const saved = await this.requestRepository.save(request);
+  const saved = await this.requestRepository.save(request);
 
-    const fieldValues = dto.fieldValues.map((fv) =>
-      this.fieldValueRepository.create({
-        requestId: saved.id,
-        fieldId: fv.fieldId,
-        value: fv.value,
-      }),
+  await this.userRepository.increment(
+    { id: currentUser.id },
+    'totalRequests',
+    1,
+  );
+
+  const fieldValues = dto.fieldValues.map((fv) =>
+    this.fieldValueRepository.create({
+      requestId: saved.id,
+      fieldId: fv.fieldId,
+      value: fv.value,
+    }),
+  );
+
+  await this.fieldValueRepository.save(fieldValues);
+  if (files?.length) {
+    await Promise.all(
+      files.map((file) =>
+        this.attachmentService.upload(
+          file,
+          currentUser.id,
+          saved.id,
+        ),
+      ),
     );
-    await this.fieldValueRepository.save(fieldValues);
-
-    const full = await this.requestRepository.findOne({ where: { id: saved.id } });
-    if (!full) throw new NotFoundException('Request not found after save.');
-    this.eventEmitter.emit(REQUEST_EVENTS.CREATED, {
-      requestId: full.id,
-      requestNumber: full.requestNumber,
-      agentEmail: currentUser.email,
-      agentName: `${currentUser.firstName} ${currentUser.lastName}`,
-      requestTypeName: full.requestType?.name ?? dto.requestTypeId,
-      fromDate: full.fromDate,
-      toDate: full.toDate,
-    });
-
-    return full;
   }
+
+  const full = await this.requestRepository.findOne({
+    where: { id: saved.id },
+  });
+
+  if (!full) {
+    throw new NotFoundException('Request not found after save.');
+  }
+
+  await this.historyService.record(
+    full.id,
+    null,
+    RequestStatus.PENDING,
+    currentUser.id,
+    'Demande soumise',
+  );
+
+  await this.auditLogService.log(
+    currentUser.id,
+    AuditAction.CREATE,
+    'REQUEST',
+    full.id,
+    {
+      requestType: full.requestType?.name,
+      status: RequestStatus.PENDING,
+    },
+  );
+
+  this.eventEmitter.emit(REQUEST_EVENTS.CREATED, {
+    requestId: full.id,
+    requestNumber: full.requestNumber,
+    agentEmail: currentUser.email,
+    agentName: `${currentUser.firstName} ${currentUser.lastName}`,
+    requestTypeName: full.requestType?.name ?? dto.requestTypeId,
+  });
+
+  return full;
+}
 
   async updateStatus(id: string, dto: UpdateRequestStatusDto, currentUser: User): Promise<Request> {
     const request = await this.requestRepository.findOne({ where: { id } });
@@ -131,7 +176,7 @@ export class RequestService {
         request.requestStatus === RequestStatus.REJECTED) {
       throw new ConflictException(`Request is already closed (${request.requestStatus}).`);
     }
-
+    const previousStatus = request.requestStatus;
     request.requestStatus = dto.requestStatus;
 
     if (dto.adminComment) {
@@ -140,6 +185,20 @@ export class RequestService {
     }
 
     const saved = await this.requestRepository.save(request);
+    await this.historyService.record(
+      saved.id,
+      previousStatus,
+      dto.requestStatus,
+      currentUser.id,
+      dto.adminComment,
+    );
+    await this.auditLogService.log(
+      currentUser.id,
+      AuditAction.UPDATE,
+      'REQUEST',
+      saved.id,
+      { oldStatus: previousStatus, newStatus: dto.requestStatus },
+    );
     this.eventEmitter.emit(REQUEST_EVENTS.STATUS_UPDATED, {
       requestId: saved.id,
       requestNumber: saved.requestNumber,
@@ -166,6 +225,21 @@ export class RequestService {
 
     request.requestStatus = RequestStatus.CONFIRMED;
     const saved = await this.requestRepository.save(request);
+    await this.historyService.record(
+      saved.id,
+      RequestStatus.ACCEPTED,
+      RequestStatus.CONFIRMED,
+      currentUser.id,
+      'Confirmée par l\'agent',
+    );
+    
+    await this.auditLogService.log(
+      currentUser.id,
+      AuditAction.UPDATE,
+      'REQUEST',
+      saved.id,
+      { status: RequestStatus.CONFIRMED },
+    );
     this.eventEmitter.emit(REQUEST_EVENTS.CONFIRMED, {
       requestId: saved.id,
       requestNumber: saved.requestNumber,
@@ -194,7 +268,19 @@ export class RequestService {
 
     qb.orderBy('request.requestDate', 'DESC');
     const [data, total] = await qb.getManyAndCount();
-    return { data, total };
+    const requests = await Promise.all(
+      data.map(async request => ({
+        ...request,
+        attachments: await this.attachmentService.findByRequest(
+          request.id,
+        ),
+      })),
+    );
+
+    return {
+      data: requests,
+      total,
+};
   }
 
   async findOne(id: string, currentUser: User): Promise<Request> {
@@ -203,7 +289,14 @@ export class RequestService {
     if (currentUser.role === UserRole.AGENT && request.userId !== currentUser.id) {
       throw new ForbiddenException('You do not have access to this request.');
     }
-    return request;
+    const attachments = await this.attachmentService.findByRequest(
+      request.id,
+    );
+
+    return {
+      ...request,
+      attachments,
+    } as Request;
   }
 
   async findAll(filters: FilterRequestsDto): Promise<PaginatedResult<Request>> {
@@ -230,7 +323,19 @@ export class RequestService {
 
     qb.orderBy('request.requestDate', 'DESC');
     const [data, total] = await qb.getManyAndCount();
-    return { data, total};
+    const requests = await Promise.all(
+      data.map(async request => ({
+        ...request,
+        attachments: await this.attachmentService.findByRequest(
+          request.id,
+        ),
+      })),
+    );
+
+    return {
+      data: requests,
+      total,
+    };
   }
 
   async addComment(id: string, dto: AddCommentDto, currentUser: User): Promise<Request> {
@@ -245,16 +350,40 @@ export class RequestService {
     return this.requestRepository.save(request);
   }
 
-  async addAttachments(id: string, dto: AddAttachmentsDto, currentUser: User): Promise<Request> {
-    const request = await this.findOne(id, currentUser);
-    if (request.requestStatus === RequestStatus.ACCEPTED ||
-        request.requestStatus === RequestStatus.REJECTED ||
-        request.requestStatus === RequestStatus.CONFIRMED) {
-      throw new ForbiddenException('Cannot add attachments to a closed request.');
-    }
-    request.attached_files = [...(request.attached_files ?? []), ...dto.files];
-    return this.requestRepository.save(request);
+  async addAttachments(
+  id: string,
+  files: Express.Multer.File[],
+  currentUser: User,
+): Promise<Request> {
+
+  const request = await this.findOne(id, currentUser);
+
+  if (
+    request.requestStatus === RequestStatus.ACCEPTED ||
+    request.requestStatus === RequestStatus.REJECTED ||
+    request.requestStatus === RequestStatus.CONFIRMED
+  ) {
+    throw new ForbiddenException(
+      'Cannot add attachments to a closed request.',
+    );
   }
+  
+  if (!files?.length) {
+    throw new BadRequestException('No files uploaded.');
+  }
+  
+  await Promise.all(
+    files.map(file =>
+      this.attachmentService.upload(
+        file,
+        currentUser.id,
+        request.id,
+      ),
+    ),
+  );
+
+  return this.findOne(id, currentUser);
+}
   async remove(id: string): Promise<{ message: string }> {
     const request = await this.requestRepository.findOne({ where: { id } });
     if (!request) throw new NotFoundException(`Request "${id}" not found.`);
@@ -314,5 +443,10 @@ export class RequestService {
       rejected:   map[RequestStatus.REJECTED]    ?? 0,
       confirmed:  map[RequestStatus.CONFIRMED]   ?? 0,
     };
+
   }
+  async getRequestHistory(id: string, currentUser: User) {
+      await this.findOne(id, currentUser); // ownership check
+      return this.historyService.findByRequest(id);
+    }
 }

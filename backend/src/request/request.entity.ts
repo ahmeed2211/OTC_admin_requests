@@ -5,6 +5,7 @@ import {
 import { User } from '../user/user.entity';
 import { RequestType } from '../request_type/request_type.entity';
 import { RequestFieldValue } from '../request_type/request_field_value.entity';
+import { Attachment } from './attachment.entity';
 
 @Entity('Requests')
 export class Request {
@@ -38,17 +39,14 @@ export class Request {
   @Column({ type: 'text', nullable: true })
   requestComment: string;
 
-  @Column({ type: 'simple-array', nullable: true })
-  attached_files: string[];
+  @OneToMany(() => Attachment, attachment => attachment.request, {
+    cascade: false,
+    eager: true,
+  })
+  attachments: Attachment[];
 
   @Column({ type: 'simple-array', nullable: true })
   comments: string[];
-
-  @Column({ nullable: true })
-  fromDate: Date;
-
-  @Column({ nullable: true })
-  toDate: Date;
 
   @OneToMany(() => RequestFieldValue, (fv) => fv.request, {
     cascade: true,

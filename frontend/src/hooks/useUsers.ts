@@ -40,9 +40,9 @@ export const useUsers = () => {
   );
 
   const getUserById = useCallback(
-    (id: string) => handle<User>(() => getUserByIdApi(id)),
-    [],
-  );
+  (id: string) => handle<User>(() => getUserByIdApi(id)),
+  [],
+);
 
   const updateUser = useCallback(
     (id: string, dto: UpdateUserDto) =>

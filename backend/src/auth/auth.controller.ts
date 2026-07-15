@@ -29,4 +29,11 @@ export class AuthController {
   ) {
     return this.authService.changePassword(currentUser.id, dto);
   }
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout - records audit log' })
+  logout(@CurrentUser() currentUser: User) {
+    return this.authService.logout(currentUser.id);
+}
 }

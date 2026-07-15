@@ -10,6 +10,8 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../user/user.entity';
 import { LoginDto, ChangePasswordDto } from './auth.dto';
 import { JwtPayload } from './jwt.strategy';
+import { AuditLogService } from 'src/user/audit_log.service';
+import { AuditAction } from 'src/common/enums';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +19,7 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async login(loginDto: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
@@ -33,6 +36,13 @@ export class AuthService {
 
     const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = this.jwtService.sign(payload);
+    await this.auditLogService.log(
+    user.id,
+    AuditAction.LOGIN,
+    'AUTH',
+    user.id,
+    { email: user.email, role: user.role },
+    );
 
     const { password, ...safeUser } = user;
     return { accessToken, user: safeUser };
@@ -49,5 +59,15 @@ export class AuthService {
     await this.userRepository.save(user);
 
     return { message: 'Password updated successfully.' };
+  }
+  async logout(userId: string) {
+  await this.auditLogService.log(
+    userId,
+    AuditAction.LOGOUT,
+    'AUTH',
+    userId,
+    {},
+  );
+  return { message: 'Logged out.' };
   }
 }

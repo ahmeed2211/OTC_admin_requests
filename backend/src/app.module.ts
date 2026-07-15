@@ -14,6 +14,11 @@ import {AuthModule} from './auth/auth.modue';
 import {RequestTypeField} from './request_type/request_type_field.entity';
 import {RequestFieldValue} from './request_type/request_field_value.entity';
 import {NotificationModule} from './notifications/notification.module';
+import { AuditLog } from './user/audit_log.entity';
+import { Attachment } from './request/attachment.entity';
+import { RequestHistory } from './request/request_history.entity';
+import { AuditLogModule } from './user/audit_log.module';
+import { AttachmentModule } from './request/attachment.module';
 
 @Module({
   imports: [
@@ -40,6 +45,9 @@ import {NotificationModule} from './notifications/notification.module';
           RequestType,
           RequestTypeField,  
           RequestFieldValue, 
+          AuditLog,
+          Attachment,
+          RequestHistory
         ],
       }),
     }),
@@ -47,7 +55,9 @@ import {NotificationModule} from './notifications/notification.module';
     UserModule,
     RequestModule,
     RequestTypeModule,
-    AuthModule
+    AuthModule,
+    AuditLogModule,
+    AttachmentModule,
   ],
 })
 export class AppModule {}

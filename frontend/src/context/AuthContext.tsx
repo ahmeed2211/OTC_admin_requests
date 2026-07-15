@@ -39,13 +39,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null);
-    setUser(null);
-    window.location.href = '/login';
-  };
-
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  setToken(null);
+  setUser(null);
+  window.location.href = '/#/login';
+    };
   return (
     <AuthContext.Provider
       value={{
