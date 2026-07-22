@@ -3,7 +3,6 @@ export enum FieldType {
   NUMBER = 'number',
   DATE = 'date',
   BOOLEAN = 'boolean',
-  FILE = 'file',
 }
 
 export interface RequestTypeField {
@@ -12,7 +11,8 @@ export interface RequestTypeField {
   fieldType: FieldType;
   isRequired: boolean;
   description: string;
-  requestTypeId: string;
+  requestTypeId?: string;
+
 }
 
 export interface RequestType {

@@ -6,5 +6,5 @@ export const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
 
-export const MAX_SIZE_BYTES = 10 * 1024 * 1024; 
+export const MAX_SIZE_BYTES = 2 * 1024 * 1024; 
 

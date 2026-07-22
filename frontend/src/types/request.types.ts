@@ -99,6 +99,7 @@ export interface AdminDashboardStats extends DashboardStats {
 
 export interface RequestHistory{
   id : string;
+  requestType : RequestType | null;
   requestId : string;
   oldStatus : string | null;
   newStatus : string;
@@ -107,7 +108,7 @@ export interface RequestHistory{
   changedAt : string;
 }
 export interface RequestHistoryFilters{
-  id:string;
+  id?:string;
   requestId?: string;
   userId?: string;
   oldStatus?: string;

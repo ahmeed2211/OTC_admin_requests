@@ -13,6 +13,7 @@ import {
   addAttachments as addAttachmentsApi,
   deleteRequest as deleteRequestApi,
   getRequestHistory as getRequestHistoryApi,
+  deleteOwnRequest as deleteOwnRequestApi,
 } from '../api/requests.api';
 import {
   Request,
@@ -23,9 +24,61 @@ import {
   PaginatedResult,
   DashboardStats,
   AdminDashboardStats,
-  RequestHistoryFilters,
   RequestHistory,
 } from '../types/request.types';
+import { RequestType } from '../types/request_types.types';
+
+const toRequestType = (value: any, id?: string): RequestType => {
+  console.log('toRequestType called with:', { value, id });
+  
+  if (typeof value === 'string') {
+    return {
+      id: id || '',
+      name: value,
+      description: '',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      fields: []
+    };
+  }
+    if (value && typeof value === 'object') {
+    return {
+      id: value.id || id || '',
+      name: value.name || '',
+      description: value.description || '',
+      isActive: value.isActive ?? true,
+      createdAt: value.createdAt || new Date().toISOString(),
+      fields: value.fields || []
+    };
+  }
+  return {
+    id: id || '',
+    name: String(value || ''),
+    description: '',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    fields: []
+  };
+};
+const transformRequest = (item: any): Request => {
+  console.log('transformRequest called with:', item);
+  console.log('item.requestType:', item.requestType);
+  console.log('item.requestTypeId:', item.requestTypeId);
+  
+  const transformed = {
+    ...item,
+    requestType: toRequestType(item.requestType, item.requestTypeId)
+  };
+  
+  console.log('transformed requestType:', transformed.requestType);
+  return transformed;
+};
+const transformHistoryEntry = (entry: any): RequestHistory => {
+  return {
+    ...entry,
+    requestType: toRequestType(entry.requestType, entry.requestTypeId)
+  };
+};
 
 export const useRequests = () => {
   const [loading, setLoading] = useState(false);
@@ -36,6 +89,7 @@ export const useRequests = () => {
     setError(null);
     try {
       const { data } = await fn();
+      console.log('API response data:', data);
       return data;
     } catch (err: any) {
       const msg = err.response?.data?.message ?? 'Une erreur est survenue.';
@@ -54,12 +108,29 @@ export const useRequests = () => {
 
   const getMyRequests = useCallback(
     (filters?: FilterRequestsDto) =>
-      handle<PaginatedResult<Request>>(() => getMyRequestsApi(filters)),
+      handle<PaginatedResult<Request>>(async () => {
+        const result = await getMyRequestsApi(filters);
+        console.log('getMyRequests raw result:', result);
+        
+        if (result.data && result.data.data) {
+          console.log('getMyRequests data array:', result.data.data);
+          result.data.data = result.data.data.map(transformRequest);
+          console.log('getMyRequests transformed data:', result.data.data);
+        }
+        return result;
+      }),
     [],
   );
 
   const getMyRequestById = useCallback(
-    (id: string) => handle<Request>(() => getMyRequestByIdApi(id)),
+    (id: string) =>
+      handle<Request>(async () => {
+        const result = await getMyRequestByIdApi(id);
+        if (result.data) {
+          result.data = transformRequest(result.data);
+        }
+        return result;
+      }),
     [],
   );
 
@@ -87,12 +158,25 @@ export const useRequests = () => {
 
   const getAllRequests = useCallback(
     (filters?: FilterRequestsDto) =>
-      handle<PaginatedResult<Request>>(() => getAllRequestsApi(filters)),
+      handle<PaginatedResult<Request>>(async () => {
+        const result = await getAllRequestsApi(filters);
+        if (result.data && result.data.data) {
+          result.data.data = result.data.data.map(transformRequest);
+        }
+        return result;
+      }),
     [],
   );
 
   const getRequestById = useCallback(
-    (id: string) => handle<Request>(() => getRequestByIdApi(id)),
+    (id: string) =>
+      handle<Request>(async () => {
+        const result = await getRequestByIdApi(id);
+        if (result.data) {
+          result.data = transformRequest(result.data);
+        }
+        return result;
+      }),
     [],
   );
 
@@ -111,12 +195,24 @@ export const useRequests = () => {
     (id: string) => handle<{ message: string }>(() => deleteRequestApi(id)),
     [],
   );
-  
+
   const getRequestHistory = useCallback(
-    (filters?: RequestHistoryFilters) =>
-      handle<RequestHistory[]>(() => getRequestHistoryApi(filters)),
+    (requestId: string) =>
+      handle<RequestHistory[]>(async () => {
+        const result = await getRequestHistoryApi(requestId);
+        if (result.data && Array.isArray(result.data)) {
+          result.data = result.data.map(transformHistoryEntry);
+        }
+        return result;
+      }),
     [],
   );
+  const deleteOwnRequest = useCallback(
+    (id: string) => handle<{ message: string }>(() => deleteOwnRequestApi(id)),
+    [],
+  );
+
+
   return {
     loading,
     error,
@@ -133,5 +229,6 @@ export const useRequests = () => {
     updateRequestStatus,
     deleteRequest,
     getRequestHistory,
+    deleteOwnRequest,
   };
 };

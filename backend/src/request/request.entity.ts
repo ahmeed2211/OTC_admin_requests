@@ -23,9 +23,10 @@ export class Request {
   @Column()
   userId: string;
 
-  @ManyToOne(() => RequestType, { eager: true, nullable: false })
+  @ManyToOne(() => RequestType, { eager: true, nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'requestTypeId' })
   requestType: RequestType;
+
 
   @Column()
   requestTypeId: string;

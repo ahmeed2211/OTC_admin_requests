@@ -10,7 +10,7 @@ export class AuditLogService {
   constructor(
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
-  ) {}
+  ) { }
 
   async log(
     userId: string,

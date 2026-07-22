@@ -5,6 +5,7 @@ import {
   FormControl, FormHelperText, InputLabel, MenuItem,
   Select, Stack, TextField, Typography, Alert,
   CircularProgress, InputAdornment, IconButton,
+  Autocomplete,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -14,7 +15,6 @@ import { useUsers } from '../../hooks/useUsers';
 import { CreateUserDto, UserRole } from '../../types/user.types';
 
 const DEPARTMENTS = [
-  'DSI',
   'Ressources Humaines',
   'Finance',
   'Direction Générale',
@@ -79,185 +79,231 @@ export default function UserCreate() {
       await createUser(form);
       setSuccess(true);
       setTimeout(() => navigate('/admin/users'), 1500);
-    } catch {
-      // error is handled by the hook
-    }
+    } catch {    }
   };
 
   return (
-    <Box sx={{ maxWidth: 680, mx: 'auto', py: 3, px: 2 }}>
+    <Box sx={{ p: 3, bgcolor: '#f8fafc', minHeight: '100vh' }}>
+      <Box sx={{ maxWidth: 680, mx: 'auto' }}>
+        <Stack direction="row" alignItems="center" spacing={1} mb={2}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate(-1)}
+            size="small"
+            sx={{ 
+              color: '#64748b',
+              '&:hover': { 
+                color: '#22c55e',
+                bgcolor: '#f0fdf4'
+              }
+            }}
+          >
+            Retour
+          </Button>
+        </Stack>
 
-      {/* Header */}
-      <Stack direction="row" alignItems="center" spacing={1} mb={3}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/admin/users')}
-          color="inherit"
-          size="small"
+        <Stack direction="row" alignItems="center" spacing={2} mb={3}>
+          <PersonAddIcon sx={{ fontSize: 32, color: '#22c55e' }} />
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#0f172a' }}>
+              Nouvel utilisateur
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b' }}>
+              Créez un compte agent ou administrateur.
+            </Typography>
+          </Box>
+        </Stack>
+
+        {success && (
+          <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+            Utilisateur créé avec succès. Redirection en cours...
+          </Alert>
+        )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        <Card 
+          variant="outlined"
+          sx={{
+            borderRadius: 3,
+            borderColor: '#e2e8f0',
+          }}
         >
-          Retour
-        </Button>
-      </Stack>
+          <CardContent>
+            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, mb: 2, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+              Informations personnelles
+            </Typography>
 
-      <Stack direction="row" alignItems="center" spacing={2} mb={3}>
-        <PersonAddIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-        <Box>
-          <Typography variant="h5" fontWeight={700}>
-            Nouvel utilisateur
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Créez un compte agent ou administrateur.
-          </Typography>
-        </Box>
-      </Stack>
+            <Stack spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <TextField
+                  label="Prénom"
+                  required
+                  fullWidth
+                  value={form.firstName}
+                  onChange={(e) => handleChange('firstName', e.target.value)}
+                  error={!!validationErrors.firstName}
+                  helperText={validationErrors.firstName}
+                  size="small"
+                  sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
+                />
+                <TextField
+                  label="Nom"
+                  required
+                  fullWidth
+                  value={form.lastName}
+                  onChange={(e) => handleChange('lastName', e.target.value)}
+                  error={!!validationErrors.lastName}
+                  helperText={validationErrors.lastName}
+                  size="small"
+                  sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
+                />
+              </Stack>
 
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          Utilisateur créé avec succès. Redirection en cours...
-        </Alert>
-      )}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Card variant="outlined">
-        <CardContent>
-          <Typography variant="subtitle2" color="text.secondary" mb={2}>
-            INFORMATIONS PERSONNELLES
-          </Typography>
-
-          <Stack spacing={2}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
-                label="Prénom"
+                label="Email"
+                type="email"
                 required
                 fullWidth
-                value={form.firstName}
-                onChange={(e) => handleChange('firstName', e.target.value)}
-                error={!!validationErrors.firstName}
-                helperText={validationErrors.firstName}
+                value={form.email}
+                onChange={(e) => handleChange('email', e.target.value)}
+                error={!!validationErrors.email}
+                helperText={validationErrors.email}
+                size="small"
+                sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
               />
+
               <TextField
-                label="Nom"
+                label="Mot de passe"
+                type={showPassword ? 'text' : 'password'}
                 required
                 fullWidth
-                value={form.lastName}
-                onChange={(e) => handleChange('lastName', e.target.value)}
-                error={!!validationErrors.lastName}
-                helperText={validationErrors.lastName}
+                value={form.password}
+                onChange={(e) => handleChange('password', e.target.value)}
+                error={!!validationErrors.password}
+                helperText={validationErrors.password ?? 'Minimum 6 caractères.'}
+                size="small"
+                sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton 
+                        onClick={() => setShowPassword((s) => !s)} 
+                        edge="end"
+                        sx={{ color: '#64748b' }}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              <TextField
+                label="Téléphone"
+                required
+                fullWidth
+                value={form.phonenumber}
+                onChange={(e) => handleChange('phonenumber', e.target.value)}
+                error={!!validationErrors.phonenumber}
+                helperText={validationErrors.phonenumber}
+                placeholder="+216 XX XXX XXX"
+                size="small"
+                sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
               />
             </Stack>
+          </CardContent>
 
-            <TextField
-              label="Email"
-              type="email"
-              required
-              fullWidth
-              value={form.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-              error={!!validationErrors.email}
-              helperText={validationErrors.email}
-            />
+          <Divider sx={{ borderColor: '#f1f5f9' }} />
 
-            <TextField
-              label="Mot de passe"
-              type={showPassword ? 'text' : 'password'}
-              required
-              fullWidth
-              value={form.password}
-              onChange={(e) => handleChange('password', e.target.value)}
-              error={!!validationErrors.password}
-              helperText={validationErrors.password ?? 'Minimum 6 caractères.'}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPassword((s) => !s)} edge="end">
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
+          <CardContent>
+            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, mb: 2, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+              Rôle et département
+            </Typography>
 
-            <TextField
-              label="Téléphone"
-              required
-              fullWidth
-              value={form.phonenumber}
-              onChange={(e) => handleChange('phonenumber', e.target.value)}
-              error={!!validationErrors.phonenumber}
-              helperText={validationErrors.phonenumber}
-              placeholder="+216 XX XXX XXX"
-            />
-          </Stack>
-        </CardContent>
-
-        <Divider />
-
-        <CardContent>
-          <Typography variant="subtitle2" color="text.secondary" mb={2}>
-            RÔLE ET DÉPARTEMENT
-          </Typography>
-
-          <Stack spacing={2}>
-            <FormControl fullWidth required error={!!validationErrors.department}>
-              <InputLabel>Département</InputLabel>
-              <Select
+            <Stack spacing={2}>
+              <Autocomplete
+                freeSolo
+                options={DEPARTMENTS}
                 value={form.department}
-                label="Département"
-                onChange={(e) => handleChange('department', e.target.value)}
+                onChange={(_, newValue) => {
+                  handleChange('department', newValue || '');
+                }}
+                onInputChange={(_, newInputValue) => {
+                  handleChange('department', newInputValue);
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Département"
+                    required
+                    error={!!validationErrors.department}
+                    helperText={validationErrors.department}
+                    size="small"
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' }
+                    }}
+                  />
+                )}
+              />
+
+              <FormControl fullWidth required size="small">
+                <InputLabel sx={{ color: '#64748b' }}>Rôle</InputLabel>
+                <Select
+                  value={form.role}
+                  label="Rôle"
+                  onChange={(e) => handleChange('role', e.target.value as UserRole)}
+                  sx={{ bgcolor: '#f8fafc' }}
+                >
+                  <MenuItem value={UserRole.AGENT}>Agent</MenuItem>
+                  <MenuItem value={UserRole.ADMIN}>Administrateur</MenuItem>
+                  <MenuItem value={UserRole.SUPER_ADMIN}>Super Administrateur</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
+          </CardContent>
+
+          <Divider sx={{ borderColor: '#f1f5f9' }} />
+
+          <CardContent>
+            <Stack direction="row" justifyContent="flex-end" spacing={2}>
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/admin/users')}
+                disabled={loading}
+                sx={{ 
+                  borderColor: '#e2e8f0',
+                  color: '#64748b',
+                  '&:hover': { 
+                    borderColor: '#22c55e',
+                    bgcolor: '#f0fdf4',
+                    color: '#22c55e'
+                  }
+                }}
               >
-                {DEPARTMENTS.map((dept) => (
-                  <MenuItem key={dept} value={dept}>
-                    {dept}
-                  </MenuItem>
-                ))}
-              </Select>
-              {validationErrors.department && (
-                <FormHelperText>{validationErrors.department}</FormHelperText>
-              )}
-            </FormControl>
-
-            <FormControl fullWidth required>
-              <InputLabel>Rôle</InputLabel>
-              <Select
-                value={form.role}
-                label="Rôle"
-                onChange={(e) => handleChange('role', e.target.value as UserRole)}
+                Annuler
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <PersonAddIcon />}
+                sx={{
+                  bgcolor: '#22c55e',
+                  '&:hover': {
+                    bgcolor: '#16a34a',
+                  }
+                }}
               >
-                <MenuItem value={UserRole.AGENT}>Agent</MenuItem>
-                <MenuItem value={UserRole.ADMIN}>Administrateur</MenuItem>
-                <MenuItem value={UserRole.SUPER_ADMIN}>Super Administrateur</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </CardContent>
-
-        <Divider />
-
-        <CardContent>
-          <Stack direction="row" justifyContent="flex-end" spacing={2}>
-            <Button
-              variant="outlined"
-              color="inherit"
-              onClick={() => navigate('/admin/users')}
-              disabled={loading}
-            >
-              Annuler
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleSubmit}
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <PersonAddIcon />}
-            >
-              {loading ? 'Création...' : 'Créer l\'utilisateur'}
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+                {loading ? 'Création...' : "Créer l'utilisateur"}
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
     </Box>
   );
 }

@@ -65,40 +65,41 @@ export class AttachmentController {
   }
 
   @Get(':id/view')
-  @Roles(UserRole.AGENT, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: '[All] View a file inline in the browser' })
-  @ApiParam({ name: 'id', type: String })
-  async view(
-  @Param('id', ParseUUIDPipe) id: string,
-  @CurrentUser() currentUser: User,
-  @Res() res: Response,
-) {
-  const attachment = await this.attachmentService.getFileForServing(id, currentUser);
-  res.setHeader('Content-Type', attachment.mime_type);
-  res.setHeader(
-    'Content-Disposition',
-    `inline; filename="${encodeURIComponent(attachment.file_name)}"`,
-  );
-  res.sendFile(attachment.file_path);
-}
-  @Get(':id/download')
-  @Roles(UserRole.AGENT, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: '[All] Download a file' })
-  @ApiParam({ name: 'id', type: String })
-  async download(
-  @Param('id', ParseUUIDPipe) id: string,
-  @CurrentUser() currentUser: User,
-  @Res() res: Response,
-) {
-  const attachment = await this.attachmentService.getFileForServing(id, currentUser);
-  res.setHeader('Content-Type', attachment.mime_type);
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${encodeURIComponent(attachment.file_name)}"`,
-  );
-  res.sendFile(attachment.file_path);
-}
+    @Roles(UserRole.AGENT, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+    @ApiOperation({ summary: '[All] View a file inline in the browser' })
+    @ApiParam({ name: 'id', type: String })
+    async view(
+      @Param('id', ParseUUIDPipe) id: string,
+      @CurrentUser() currentUser: User,
+      @Res() res: Response,
+    ) {
+      const attachment = await this.attachmentService.viewAttachment(id, currentUser);
+      res.setHeader('Content-Type', attachment.mime_type);
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename="${encodeURIComponent(attachment.file_name)}"`,
+      );
+      res.sendFile(attachment.file_path);
+    }
 
+    @Get(':id/download')
+    @Roles(UserRole.AGENT, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+    @ApiOperation({ summary: '[All] Download a file' })
+    @ApiParam({ name: 'id', type: String })
+    async download(
+      @Param('id', ParseUUIDPipe) id: string,
+      @CurrentUser() currentUser: User,
+      @Res() res: Response,
+    ) {
+      // 👇 Call the new method that logs DOWNLOAD
+      const attachment = await this.attachmentService.downloadAttachment(id, currentUser);
+      res.setHeader('Content-Type', attachment.mime_type);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(attachment.file_name)}"`,
+      );
+      res.sendFile(attachment.file_path);
+    }
   @Delete(':id')
   @Roles(UserRole.AGENT)
   @HttpCode(HttpStatus.OK)

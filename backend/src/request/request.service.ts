@@ -384,6 +384,7 @@ export class RequestService {
 
   return this.findOne(id, currentUser);
 }
+  
   async remove(id: string): Promise<{ message: string }> {
     const request = await this.requestRepository.findOne({ where: { id } });
     if (!request) throw new NotFoundException(`Request "${id}" not found.`);
@@ -449,4 +450,21 @@ export class RequestService {
       await this.findOne(id, currentUser); // ownership check
       return this.historyService.findByRequest(id);
     }
+  async deleteOwnRequest(id: string, currentUser: User): Promise<{ message: string }> {
+  const request = await this.requestRepository.findOne({ where: { id } });
+  if (!request) throw new NotFoundException(`Request "${id}" not found.`);
+  if (request.userId !== currentUser.id)
+    throw new ForbiddenException('You can only delete your own requests.');
+  if (request.requestStatus !== RequestStatus.PENDING)
+    throw new ForbiddenException('You can only delete requests that are still pending (En attente).');
+ 
+  await this.requestRepository.remove(request);
+ 
+  await this.auditLogService.log(
+    currentUser.id, AuditAction.DELETE, 'REQUEST', id,
+    { requestNumber: request.requestNumber },
+  );
+ 
+  return { message: `Request #${request.requestNumber} deleted.` };
+}
 }

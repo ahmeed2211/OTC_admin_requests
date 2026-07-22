@@ -4,6 +4,7 @@ import {
 } from 'typeorm';
 import { User } from '../user/user.entity';
 import { AuditAction } from '../common/enums';
+@Entity()
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;

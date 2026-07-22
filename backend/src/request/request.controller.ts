@@ -26,7 +26,7 @@ import { attachmentStorage } from '../common/multer.config'
 import {
   FilesInterceptor,
 } from '@nestjs/platform-express';
-
+import { RequestHistoryService } from './request_history.service';
 import {
   ApiConsumes,
   ApiBody,
@@ -37,7 +37,10 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('requests')
 export class RequestController {
-  constructor(private readonly requestService: RequestService) {}
+  constructor(
+    private readonly requestService: RequestService,
+    private readonly requestHistoryService: RequestHistoryService,
+  ) {}
 @Post()
 @Roles(UserRole.AGENT)
 @UseInterceptors(FilesInterceptor('files', 10, { storage: attachmentStorage }))
@@ -192,4 +195,19 @@ export class RequestController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.requestService.remove(id);
   }
+  @Get(':id/history')
+  getRequestHistory(@Param('id') id: string) {
+  return this.requestHistoryService.findByRequest(id);
+}
+@Delete('my/:id')
+@Roles(UserRole.AGENT)
+@HttpCode(HttpStatus.OK)
+@ApiOperation({ summary: '[Agent] Delete own pending request' })
+@ApiParam({ name: 'id', type: String })
+deleteOwn(
+  @Param('id', ParseUUIDPipe) id: string,
+  @CurrentUser() currentUser: User,
+) {
+  return this.requestService.deleteOwnRequest(id, currentUser);
+}
 }

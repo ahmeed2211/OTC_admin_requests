@@ -7,3 +7,5 @@ export const login = (dto: LoginDto): Promise<{ data: LoginResponse }> =>
 export const changePassword = (dto: ChangePasswordDto): Promise<{ data: { message: string } }> =>
   api.post('/auth/change-password', dto);
  
+export const logout = (): Promise<{ data: { message: string } }> =>
+  api.post('/auth/logout');

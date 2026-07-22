@@ -1,0 +1,130 @@
+.profileContainer {
+  padding: 24px;
+  background-color: #f8fafc;
+  min-height: 100vh;
+}
+
+.profileInner {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.backButton {
+  color: #64748b;
+  margin-bottom: 24px;
+}
+.backButton:hover {
+  color: #22c55e;
+  background-color: #f0fdf4;
+}
+
+.pageTitle {
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 24px;
+  font-size: 1.5rem;
+}
+
+.infoPaper,
+.passwordPaper {
+  padding: 24px;
+  margin-bottom: 24px;
+  background-color: white;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.profileAvatar {
+  width: 72px;
+  height: 72px;
+  font-size: 24px;
+  background-color: #22c55e;
+  color: white;
+}
+
+.profileName {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.profileEmail {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.profileRole {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.divider {
+  margin-bottom: 16px;
+  border-color: #f1f5f9;
+}
+
+.infoRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+
+.infoLabel {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.infoValue {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.875rem;
+}
+
+.statusActive {
+  color: #16a34a;
+}
+
+.statusInactive {
+  color: #ef4444;
+}
+
+.passwordTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.passwordTitle svg {
+  color: #22c55e;
+}
+.passwordTitleText {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.successAlert {
+  margin-bottom: 16px;
+  border-radius: 12px;
+}
+
+.errorAlert {
+  margin-bottom: 16px;
+  border-radius: 12px;
+}
+
+.passwordFields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.passwordField {
+  background-color: #f8fafc;
+}
+
+.changeButton {
+  background-color: #22c55e;
+  color: white;
+}
+.changeButton:hover {
+  background-color: #16a34a;
+}

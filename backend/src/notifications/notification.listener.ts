@@ -37,7 +37,7 @@ export class NotificationListener {
     for (const admin of admins) {
       this.sseService.push(admin.id, {
         type: 'NEW_REQUEST',
-        message: `Nouvelle demande #${payload.requestNumber} soumise par ${payload.agentName}`,
+        message: `Nouvelle demande N°${payload.requestNumber} soumise par ${payload.agentName}`,
         requestId: payload.requestId,
         requestNumber: payload.requestNumber,
       });
@@ -56,7 +56,7 @@ export class NotificationListener {
 
     this.sseService.push(payload.requestId, {
       type: 'STATUS_UPDATED',
-      message: `Votre demande #${payload.requestNumber} est maintenant : ${payload.newStatus}`,
+      message: `Votre demande N°${payload.requestNumber} est maintenant : ${payload.newStatus}`,
       requestId: payload.requestId,
       requestNumber: payload.requestNumber,
     });
@@ -77,7 +77,7 @@ export class NotificationListener {
     for (const admin of admins) {
       this.sseService.push(admin.id, {
         type: 'REQUEST_CONFIRMED',
-        message: `Demande #${payload.requestNumber} confirmée par ${payload.agentName}`,
+        message: `Demande N°${payload.requestNumber} confirmée par ${payload.agentName}`,
         requestId: payload.requestId,
         requestNumber: payload.requestNumber,
       });

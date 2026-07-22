@@ -9,15 +9,13 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { User } from '../user/user.entity';
-import { AuditLogModule } from '../user/audit_log.module'; // <-- add this
+import { AuditLogModule } from '../user/audit_log.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
-    AuditLogModule, // <-- add this
-
+    AuditLogModule,
     PassportModule,
-
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

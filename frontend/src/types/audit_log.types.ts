@@ -12,6 +12,13 @@ export enum AuditAction {
 export interface AuditLog {
   id: string;
   user_id: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  };
   action: AuditAction;
   resource_type: string;
   resource_id: string;

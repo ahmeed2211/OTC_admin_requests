@@ -24,6 +24,8 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { CurrentUser } from 'src/auth/current-user.decorator';
+import {User} from './user.entity'
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -35,8 +37,8 @@ export class UserController {
 
   @Post()
   @ApiOperation({ summary: '[SuperAdmin] Create a new user' })
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.createUser(createUserDto);
+  create(@Body() createUserDto: CreateUserDto, @CurrentUser() currentUser: User ) {
+    return this.userService.createUser(createUserDto, currentUser);
   }
 
   @Get()
@@ -62,20 +64,20 @@ export class UserController {
 
   @Patch(':id')
   @ApiOperation({ summary: '[SuperAdmin] Update user fields' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.updateUser(id, updateUserDto);
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @CurrentUser() currentUser: User ) {
+    return this.userService.updateUser(id, updateUserDto, currentUser);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: '[SuperAdmin] Delete a user' })
-  remove(@Param('id') id: string) {
-    return this.userService.deleteUser(id);
+  remove(@Param('id') id: string, @CurrentUser() currentUser: User ) {
+    return this.userService.deleteUser(id, currentUser);
   }
 
   @Patch(':id/toggle-active')
   @ApiOperation({ summary: '[SuperAdmin] Activate or deactivate a user' })
-  toggleActive(@Param('id') id: string) {
-    return this.userService.toggleActivate(id);
+  toggleActive(@Param('id') id: string, @CurrentUser() currentUser: User ) {
+    return this.userService.toggleActivate(id, currentUser);
   }
 
   @Patch(':id/reset-password')
@@ -85,7 +87,8 @@ export class UserController {
     @Param('id') id: string,
     @Body('password') oldpassword: string,
     @Body('password') newpassword: string,
+    @CurrentUser() currentUser: User 
   ) {
-    return this.userService.resetPassword(id, oldpassword, newpassword);
+    return this.userService.resetPassword(id, oldpassword, newpassword, currentUser);
   }
 }

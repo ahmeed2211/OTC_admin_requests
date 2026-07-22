@@ -1,10 +1,18 @@
 import { useState } from 'react';
 import { useAuthContext } from '../context/AuthContext';
-import { changePassword as changePasswordApi } from '../api/auth.api';
+import { changePassword as changePasswordApi, logout as logoutApi } from '../api/auth.api';
 import { LoginDto, ChangePasswordDto } from '../types/auth.types';
 
 export const useAuth = () => {
-  const { user, token, isLoading, login: contextLogin, logout, isAuthenticated } = useAuthContext();
+  const {
+    user,
+    token,
+    isLoading,
+    login: contextLogin,
+    logout: contextLogout, 
+    isAuthenticated,
+  } = useAuthContext();
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,5 +43,29 @@ export const useAuth = () => {
     }
   };
 
-  return { user, token, isLoading, isAuthenticated, loading, error, login, logout, changePassword };
+  const logout = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await logoutApi();      
+      contextLogout();       
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? 'Erreur lors de la déconnexion.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return {
+    user,
+    token,
+    isLoading,
+    isAuthenticated,
+    loading,
+    error,
+    login,
+    logout,
+    changePassword,
+  };
 };

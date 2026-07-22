@@ -12,3 +12,6 @@ export const getAuditLogsByResource = (
 
 export const getAllAuditLogs = (resourceType?: string): Promise<{ data: AuditLog[] }> =>
   api.get('/audit-logs', { params: { resourceType } });
+
+
+ 

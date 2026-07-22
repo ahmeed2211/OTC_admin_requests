@@ -9,7 +9,6 @@ import {
   DashboardStats,
   AdminDashboardStats,
   RequestHistory,
-  RequestHistoryFilters,
 } from '../types/request.types';
 
 
@@ -82,5 +81,8 @@ export const updateRequestStatus = (
 export const deleteRequest = (id: string): Promise<{ data: { message: string } }> =>
   api.delete(`/requests/${id}`);
 
-export const getRequestHistory =(filters?: RequestHistoryFilters) : Promise<{ data: RequestHistory[] }> =>
-  api.get(`/requests/my`, { params: filters });
+export const getRequestHistory = (id: string) =>
+  api.get(`/requests/${id}/history`);
+
+export const deleteOwnRequest = (id: string): Promise<{ data: { message: string } }> =>
+  api.delete(`/requests/my/${id}`);

@@ -1,4 +1,3 @@
-// src/common/multer.config.ts
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 

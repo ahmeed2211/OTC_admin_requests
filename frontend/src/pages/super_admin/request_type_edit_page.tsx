@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Card, CardContent, CircularProgress, Divider,
+  Box, Button, CircularProgress, Divider,
   FormControl, FormControlLabel, IconButton, InputLabel,
   MenuItem, Select, Stack, Switch, TextField, Typography,
-  Alert, Chip,
+  Alert, Chip, Paper,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
@@ -17,7 +17,6 @@ const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   [FieldType.NUMBER]: 'Nombre',
   [FieldType.DATE]: 'Date',
   [FieldType.BOOLEAN]: 'Oui / Non',
-  [FieldType.FILE]: 'Fichier',
 };
 
 const emptyField = (): CreateFieldDto => ({
@@ -60,7 +59,7 @@ export default function RequestTypeEditPage() {
     }
   };
 
-  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [id]);
 
   const handleSaveMetadata = async () => {
     if (!id) return;
@@ -126,54 +125,74 @@ export default function RequestTypeEditPage() {
 
   if (initialLoad) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}>
-        <CircularProgress />
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', bgcolor: '#f8fafc' }}>
+        <CircularProgress size={36} sx={{ color: '#22c55e' }} />
       </Box>
     );
   }
 
   if (!requestType) {
     return (
-      <Box sx={{ p: 5 }}>
-        <Alert severity="error">{formError || 'Type de demande introuvable.'}</Alert>
+      <Box sx={{ p: 3, bgcolor: '#f8fafc', minHeight: '100vh' }}>
+        <Alert severity="error" sx={{ borderRadius: 2 }}>{formError || 'Type de demande introuvable.'}</Alert>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', py: 3, px: 2 }}>
-      <Stack direction="row" alignItems="center" spacing={1} mb={3}>
+    <Box sx={{ p: 3, bgcolor: '#f8fafc', minHeight: '100vh' }}>
+      <Box sx={{ maxWidth: 800, mx: 'auto' }}>
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/super-admin/request-types')}
-          color="inherit"
+          onClick={() => navigate(-1)}
           size="small"
+          sx={{
+            color: '#64748b',
+            mb: 3,
+            '&:hover': {
+              color: '#22c55e',
+              bgcolor: '#f0fdf4',
+            },
+          }}
         >
           Retour
         </Button>
-      </Stack>
 
-      <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
-        <Typography variant="h5" fontWeight={700}>{requestType.name}</Typography>
-        <Chip
-          label={requestType.isActive ? 'Actif' : 'Inactif'}
-          color={requestType.isActive ? 'success' : 'default'}
-          size="small"
-        />
-      </Stack>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Modifiez les informations générales et les champs de ce type de demande.
-      </Typography>
+        <Stack direction="row" alignItems="center" spacing={1.5} mb={0.5}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#0f172a' }}>
+            {requestType.name}
+          </Typography>
+          <Chip
+            label={requestType.isActive ? 'Actif' : 'Inactif'}
+            size="small"
+            sx={{
+              bgcolor: requestType.isActive ? '#f0fdf4' : '#f1f5f9',
+              color: requestType.isActive ? '#16a34a' : '#64748b',
+              fontWeight: 500,
+              border: 'none',
+            }}
+          />
+        </Stack>
+        <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+          Modifiez les informations générales et les champs de ce type de demande.
+        </Typography>
 
-      {(error || formError) && (
-        <Alert severity="error" sx={{ mb: 2 }}>{formError || error}</Alert>
-      )}
-      {saveSuccess && (
-        <Alert severity="success" sx={{ mb: 2 }}>Modifications enregistrées.</Alert>
-      )}
-
-      <Card variant="outlined" sx={{ mb: 3 }}>
-        <CardContent>
+        {(error || formError) && (
+          <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{formError || error}</Alert>
+        )}
+        {saveSuccess && (
+          <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>Modifications enregistrées.</Alert>
+        )}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 3,
+            bgcolor: 'white',
+            borderRadius: 3,
+            border: '1px solid #e2e8f0',
+          }}
+        >
           <Stack spacing={2}>
             <TextField
               label="Nom du type de demande"
@@ -181,6 +200,8 @@ export default function RequestTypeEditPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              size="small"
+              sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
             />
             <TextField
               label="Description"
@@ -189,130 +210,244 @@ export default function RequestTypeEditPage() {
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              size="small"
+              sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
             />
             <FormControlLabel
               control={
-                <Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+                <Switch
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: '#22c55e',
+                    },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                      bgcolor: '#22c55e',
+                    },
+                  }}
+                />
               }
-              label="Type de demande actif"
+              label={
+                <Typography variant="body2" sx={{ color: '#1e293b' }}>
+                  Type de demande actif
+                </Typography>
+              }
             />
             <Stack direction="row" justifyContent="flex-end">
-              <Button variant="contained" onClick={handleSaveMetadata} disabled={loading}>
+              <Button
+                variant="contained"
+                onClick={handleSaveMetadata}
+                disabled={loading}
+                sx={{
+                  bgcolor: '#22c55e',
+                  '&:hover': { bgcolor: '#16a34a' },
+                }}
+              >
                 Enregistrer
               </Button>
             </Stack>
           </Stack>
-        </CardContent>
-      </Card>
+        </Paper>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0f172a', mb: 1.5 }}>
+          Champs existants ({requestType.fields?.length ?? 0})
+        </Typography>
 
-      <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
-        Champs existants ({requestType.fields?.length ?? 0})
-      </Typography>
-
-      <Stack spacing={1.5} mb={3}>
-        {(requestType.fields ?? []).length === 0 && (
-          <Typography variant="body2" color="text.secondary">
-            Aucun champ défini pour ce type.
-          </Typography>
-        )}
-        {requestType.fields?.map((field) => (
-          <Card key={field.id} variant="outlined">
-            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Stack spacing={1.5} mb={3}>
+          {(requestType.fields ?? []).length === 0 && (
+            <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+              Aucun champ défini pour ce type.
+            </Typography>
+          )}
+          {requestType.fields?.map((field) => (
+            <Paper
+              key={field.id}
+              elevation={0}
+              sx={{
+                p: 2,
+                bgcolor: 'white',
+                borderRadius: 3,
+                border: '1px solid #e2e8f0',
+              }}
+            >
               <Stack direction="row" alignItems="center" justifyContent="space-between">
                 <Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="body2" fontWeight={600}>{field.fieldName}</Typography>
-                    <Chip label={FIELD_TYPE_LABELS[field.fieldType]} size="small" variant="outlined" />
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
+                      {field.fieldName}
+                    </Typography>
+                    <Chip
+                      label={FIELD_TYPE_LABELS[field.fieldType]}
+                      size="small"
+                      variant="outlined"
+                      sx={{ borderColor: '#e2e8f0', color: '#475569' }}
+                    />
                     {field.isRequired && (
-                      <Chip label="Requis" size="small" color="warning" variant="outlined" />
+                      <Chip
+                        label="Requis"
+                        size="small"
+                        sx={{ bgcolor: '#fef3c7', color: '#d97706', border: 'none', fontWeight: 500 }}
+                      />
                     )}
                   </Stack>
                   {field.description && (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
                       {field.description}
                     </Typography>
                   )}
                 </Box>
                 <IconButton
                   size="small"
-                  color="error"
                   onClick={() => handleRemoveExistingField(field.id)}
+                  sx={{
+                    color: '#64748b',
+                    '&:hover': {
+                      bgcolor: '#fef2f2',
+                      color: '#ef4444',
+                    },
+                  }}
                 >
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </Stack>
-            </CardContent>
-          </Card>
-        ))}
-      </Stack>
-
-      <Divider sx={{ mb: 3 }} />
-
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
-        <Typography variant="subtitle1" fontWeight={700}>Ajouter des champs</Typography>
-        <Button startIcon={<AddIcon />} onClick={addNewFieldRow} size="small">
-          Nouveau champ
-        </Button>
-      </Stack>
-
-      {newFields.length > 0 && (
-        <Stack spacing={2} mb={2}>
-          {newFields.map((field, index) => (
-            <Card key={index} variant="outlined">
-              <CardContent>
-                <Stack direction="row" spacing={2} alignItems="flex-start">
-                  <Stack spacing={2} flex={1}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                      <TextField
-                        label="Nom du champ"
-                        value={field.fieldName}
-                        onChange={(e) => updateNewField(index, { fieldName: e.target.value })}
-                        fullWidth
-                        required
-                      />
-                      <FormControl fullWidth>
-                        <InputLabel>Type</InputLabel>
-                        <Select
-                          value={field.fieldType}
-                          label="Type"
-                          onChange={(e) => updateNewField(index, { fieldType: e.target.value as FieldType })}
-                        >
-                          {Object.values(FieldType).map((ft) => (
-                            <MenuItem key={ft} value={ft}>{FIELD_TYPE_LABELS[ft]}</MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Stack>
-                    <TextField
-                      label="Description (optionnel)"
-                      value={field.description}
-                      onChange={(e) => updateNewField(index, { description: e.target.value })}
-                      fullWidth
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={field.isRequired}
-                          onChange={(e) => updateNewField(index, { isRequired: e.target.checked })}
-                        />
-                      }
-                      label="Champ obligatoire"
-                    />
-                  </Stack>
-                  <IconButton color="error" onClick={() => removeNewFieldRow(index)} sx={{ mt: 1 }}>
-                    <DeleteIcon />
-                  </IconButton>
-                </Stack>
-              </CardContent>
-            </Card>
+            </Paper>
           ))}
-          <Stack direction="row" justifyContent="flex-end">
-            <Button variant="contained" onClick={handleAddFields} disabled={loading}>
-              Ajouter les champs
-            </Button>
-          </Stack>
         </Stack>
-      )}
+
+        <Divider sx={{ mb: 3, borderColor: '#f1f5f9' }} />
+
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0f172a' }}>
+            Ajouter des champs
+          </Typography>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={addNewFieldRow}
+            size="small"
+            sx={{
+              color: '#22c55e',
+              '&:hover': { bgcolor: '#f0fdf4' },
+            }}
+          >
+            Nouveau champ
+          </Button>
+        </Stack>
+
+        {newFields.length > 0 && (
+          <>
+            <Stack spacing={2} mb={2}>
+              {newFields.map((field, index) => (
+                <Paper
+                  key={index}
+                  elevation={0}
+                  sx={{
+                    p: 2.5,
+                    bgcolor: 'white',
+                    borderRadius: 3,
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <Stack direction="row" spacing={2} alignItems="flex-start">
+                    <Stack spacing={2} flex={1}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                        <TextField
+                          label="Nom du champ"
+                          value={field.fieldName}
+                          onChange={(e) => updateNewField(index, { fieldName: e.target.value })}
+                          fullWidth
+                          required
+                          size="small"
+                          sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
+                        />
+                        <FormControl fullWidth size="small">
+                          <InputLabel sx={{ color: '#64748b' }}>Type</InputLabel>
+                          <Select
+                            value={field.fieldType}
+                            label="Type"
+                            onChange={(e) => updateNewField(index, { fieldType: e.target.value as FieldType })}
+                            sx={{ bgcolor: '#f8fafc' }}
+                          >
+                            {Object.values(FieldType).map((ft) => (
+                              <MenuItem key={ft} value={ft}>{FIELD_TYPE_LABELS[ft]}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Stack>
+                      <TextField
+                        label="Description (optionnel)"
+                        value={field.description}
+                        onChange={(e) => updateNewField(index, { description: e.target.value })}
+                        fullWidth
+                        size="small"
+                        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
+                      />
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={field.isRequired}
+                            onChange={(e) => updateNewField(index, { isRequired: e.target.checked })}
+                            sx={{
+                              '& .MuiSwitch-switchBase.Mui-checked': {
+                                color: '#22c55e',
+                              },
+                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                                bgcolor: '#22c55e',
+                              },
+                            }}
+                          />
+                        }
+                        label={
+                          <Typography variant="body2" sx={{ color: '#1e293b' }}>
+                            Champ obligatoire
+                          </Typography>
+                        }
+                      />
+                    </Stack>
+                    <IconButton
+                      color="error"
+                      onClick={() => removeNewFieldRow(index)}
+                      sx={{
+                        mt: 1,
+                        color: '#64748b',
+                        '&:hover': {
+                          bgcolor: '#fef2f2',
+                          color: '#ef4444',
+                        },
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+            <Stack direction="row" justifyContent="flex-end" spacing={2}>
+              <Button
+                variant="outlined"
+                onClick={() => setNewFields([])}
+                sx={{
+                  borderColor: '#e2e8f0',
+                  color: '#64748b',
+                  '&:hover': { borderColor: '#ef4444', color: '#ef4444', bgcolor: '#fef2f2' },
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleAddFields}
+                disabled={loading}
+                sx={{
+                  bgcolor: '#22c55e',
+                  '&:hover': { bgcolor: '#16a34a' },
+                }}
+              >
+                Ajouter les champs
+              </Button>
+            </Stack>
+          </>
+        )}
+      </Box>
     </Box>
   );
 }

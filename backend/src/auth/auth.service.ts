@@ -10,8 +10,8 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../user/user.entity';
 import { LoginDto, ChangePasswordDto } from './auth.dto';
 import { JwtPayload } from './jwt.strategy';
-import { AuditLogService } from 'src/user/audit_log.service';
-import { AuditAction } from 'src/common/enums';
+import { AuditLogService } from '../user/audit_log.service';
+import { AuditAction } from '../common/enums';
 
 @Injectable()
 export class AuthService {

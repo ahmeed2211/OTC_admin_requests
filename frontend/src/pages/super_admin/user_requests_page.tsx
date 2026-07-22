@@ -5,15 +5,15 @@ import {
   Table, TableBody, TableCell, TableHead, TableRow,
   Typography, Alert, IconButton, Avatar, Tooltip,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useRequests } from '../../hooks/useRequests';
 import { useUsers } from '../../hooks/useUsers';
 import { Request, RequestStatus } from '../../types/request.types';
 import { User } from '../../types/user.types';
 import { useAttachments } from '../../hooks/useAttachment';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import DownloadIcon from '@mui/icons-material/Download';
+import  Navbar from '../../components/super_admin/Navbar';
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   [RequestStatus.PENDING]: 'En attente',
@@ -34,7 +34,7 @@ const STATUS_COLORS: Record<RequestStatus, 'default' | 'info' | 'success' | 'err
   [RequestStatus.CONFIRMED]: 'primary',
   [RequestStatus.DRAFT]: 'default',
   [RequestStatus.SUBMITTED]: 'info',
-    [RequestStatus.CANCELLED]: 'error',
+  [RequestStatus.CANCELLED]: 'error',
 };
 
 const getInitials = (firstName?: string, lastName?: string) =>
@@ -68,36 +68,14 @@ export default function UserRequestsPage() {
     }
   };
 
-  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [id]);
+
+  const pageTitle = targetUser ? `${targetUser.firstName} ${targetUser.lastName}` : 'Demandes';
+  const pageSubtitle = targetUser ? `${targetUser.email} - ${total} demande${total > 1 ? 's' : ''} au total` : undefined;
 
   return (
-    <Box sx={{ p: 5 }}>
-      <Stack direction="row" alignItems="center" spacing={1} mb={3}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/admin/users')}
-          color="inherit"
-          size="small"
-        >
-          Retour aux utilisateurs
-        </Button>
-      </Stack>
-
-      <Stack direction="row" alignItems="center" spacing={2} mb={1}>
-        {targetUser && (
-          <Avatar sx={{ width: 44, height: 44, bgcolor: 'primary.main' }}>
-            {getInitials(targetUser.firstName, targetUser.lastName)}
-          </Avatar>
-        )}
-        <Box>
-          <Typography variant="h5" fontWeight={700}>
-            {targetUser ? `${targetUser.firstName} ${targetUser.lastName}` : 'Demandes'}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {targetUser?.email} - {total} demande{total > 1 ? 's' : ''} au total
-          </Typography>
-        </Box>
-      </Stack>
+    <Box sx={{ p: 3, bgcolor: '#f8fafc', minHeight: '100vh' }}>
+      <Navbar title={pageTitle} subtitle={pageSubtitle} showBack />
 
       {(error || loadError) && (
         <Alert severity="error" sx={{ my: 2 }}>{error || loadError}</Alert>
@@ -129,7 +107,7 @@ export default function UserRequestsPage() {
                 <TableRow key={request.id} hover>
                   <TableCell>
                     <Typography variant="body2" fontWeight={600}>
-                      #{request.requestNumber}
+                      {request.requestNumber}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -149,12 +127,12 @@ export default function UserRequestsPage() {
                   </TableCell>
                   <TableCell>
                     {request.attachments?.length ? (
-                        <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap">
                         {request.attachments.map((att) => (
-                            <Chip
+                          <Chip
                             key={att.id}
                             icon={
-                                pendingId === att.id
+                              pendingId === att.id
                                 ? <CircularProgress size={14} />
                                 : <InsertDriveFileIcon fontSize="small" />
                             }
@@ -166,13 +144,13 @@ export default function UserRequestsPage() {
                             deleteIcon={<Tooltip title="Télécharger"><DownloadIcon fontSize="small" /></Tooltip>}
                             disabled={pendingId === att.id}
                             sx={{ maxWidth: 180, cursor: 'pointer' }}
-                            />
+                          />
                         ))}
-                        </Stack>
+                      </Stack>
                     ) : (
-                        <Typography variant="body2" color="text.secondary">-</Typography>
+                      <Typography variant="body2" color="text.secondary">-</Typography>
                     )}
-                    </TableCell>
+                  </TableCell>
                   <TableCell align="right">
                     <Tooltip title="Voir le détail">
                       <IconButton

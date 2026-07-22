@@ -10,9 +10,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ALLOWED_MIME_TYPES, MAX_SIZE_BYTES } from '../common/attachment';
 import { User } from '../user/user.entity';
-import { UserRole } from '../common/enums';
+import { UserRole, AuditAction } from '../common/enums'; 
 import { isAbsolute, join } from 'path';
 import { UPLOAD_DIR } from '../common/multer.config';
+import { AuditLogService } from 'src/user/audit_log.service';
 
 @Injectable()
 export class AttachmentService {
@@ -21,8 +22,8 @@ export class AttachmentService {
     private readonly attachmentRepository: Repository<Attachment>,
     @InjectRepository(Request)
     private readonly requestRepository: Repository<Request>,
+    private readonly auditLogService: AuditLogService,
   ) {}
-
   async upload(
     file: Express.Multer.File,
     uploadedBy: string,
@@ -65,12 +66,10 @@ export class AttachmentService {
     return attachment;
   }
 
-  // Throws if currentUser has no right to access this attachment's file.
   private async assertCanAccess(attachment: Attachment, currentUser: User): Promise<void> {
     if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUPER_ADMIN) {
       return;
     }
-    // AGENT: only allowed if they own the parent request (or uploaded it themselves)
     if (attachment.uploaded_by === currentUser.id) return;
 
     if (attachment.request_id) {
@@ -83,21 +82,20 @@ export class AttachmentService {
     throw new ForbiddenException('You do not have access to this file.');
   }
 
+  async getFileForServing(id: string, currentUser: User): Promise<Attachment> {
+    const attachment = await this.findOne(id);
+    await this.assertCanAccess(attachment, currentUser);
 
-async getFileForServing(id: string, currentUser: User): Promise<Attachment> {
-  const attachment = await this.findOne(id);
-  await this.assertCanAccess(attachment, currentUser);
+    const resolvedPath = isAbsolute(attachment.file_path)
+      ? attachment.file_path
+      : join(UPLOAD_DIR, attachment.file_path.replace(/^uploads[\\/]/, ''));
 
-  const resolvedPath = isAbsolute(attachment.file_path)
-    ? attachment.file_path
-    : join(UPLOAD_DIR, attachment.file_path.replace(/^uploads[\\/]/, ''));
+    if (!fs.existsSync(resolvedPath)) {
+      throw new NotFoundException('Fichier introuvable sur le serveur.');
+    }
 
-  if (!fs.existsSync(resolvedPath)) {
-    throw new NotFoundException('Fichier introuvable sur le serveur.');
+    return { ...attachment, file_path: resolvedPath };
   }
-
-  return { ...attachment, file_path: resolvedPath };
-}
 
   async delete(id: string, userId: string): Promise<{ message: string }> {
     const attachment = await this.findOne(id);
@@ -112,5 +110,40 @@ async getFileForServing(id: string, currentUser: User): Promise<Attachment> {
 
     await this.attachmentRepository.remove(attachment);
     return { message: `Attachment "${attachment.file_name}" deleted.` };
+  }
+
+  async viewAttachment(id: string, currentUser: User): Promise<Attachment> {
+    const attachment = await this.getFileForServing(id, currentUser);
+    await this.auditLogService.log(
+      currentUser.id,
+      AuditAction.VIEW,
+      'ATTACHMENT',
+      attachment.id,
+      {
+        fileName: attachment.file_name,
+        requestId: attachment.request_id,
+        fileSize: attachment.size_bytes,
+      },
+    );
+
+    return attachment;
+  }
+
+  async downloadAttachment(id: string, currentUser: User): Promise<Attachment> {
+    const attachment = await this.getFileForServing(id, currentUser);
+
+    await this.auditLogService.log(
+      currentUser.id,
+      AuditAction.DOWNLOAD,
+      'ATTACHMENT',
+      attachment.id,
+      {
+        fileName: attachment.file_name,
+        requestId: attachment.request_id,
+        fileSize: attachment.size_bytes,
+      },
+    );
+
+    return attachment;
   }
 }

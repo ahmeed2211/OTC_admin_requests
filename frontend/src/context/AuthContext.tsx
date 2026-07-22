@@ -1,5 +1,3 @@
-// src/context/AuthContext.tsx
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types/user.types';
 import { LoginDto } from '../types/auth.types';

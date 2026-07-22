@@ -27,10 +27,40 @@ export class RequestHistoryService {
     await this.historyRepository.save(entry);
   }
 
-  async findByRequest(requestId: string): Promise<RequestHistory[]> {
-    return this.historyRepository.find({
-      where: { request_id: requestId },
-      order: { changed_at: 'ASC' },
-    });
-  }
+  async findByRequest(requestId: string) {
+  const history = await this.historyRepository.find({
+    where: { request_id: requestId },
+    relations: {
+      request: {
+        requestType: true,
+      },
+    },
+    order: {
+      changed_at: 'ASC',
+    },
+  });
+
+  return history.map((h) => ({
+    id: h.id,
+    requestId: h.request_id,
+    requestNumber: h.request.requestNumber,
+    requestType: h.request.requestType?.name ?? null,
+    period:
+      (h.request as any).fromDate && (h.request as any).toDate
+        ? `${new Date((h.request as any).fromDate).toLocaleDateString('fr-FR')} → ${new Date((h.request as any).toDate).toLocaleDateString('fr-FR')}`
+        : null,
+
+    oldStatus: h.old_status,
+    newStatus: h.new_status,
+
+    changedBy: {
+      id: h.changer.id,
+      fullName: `${h.changer.firstName} ${h.changer.lastName}`,
+    },
+
+    comment: h.comment,
+    changedAt: h.changed_at,
+  }));
+}
+
 }

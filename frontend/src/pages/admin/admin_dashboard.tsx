@@ -1,392 +1,492 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Card, Chip, CircularProgress,
-  IconButton, MenuItem, Select, Stack, TextField,
-  Tooltip, Typography, Alert, Table, TableBody,
-  TableCell, TableHead, TableRow, FormControl,
-  InputLabel, TableSortLabel, Dialog, DialogTitle,
-  DialogContent, DialogContentText, DialogActions,
-  TablePagination,
+  Box, Card, CardContent, Chip, CircularProgress,
+  FormControl, InputAdornment, InputLabel, MenuItem,
+  Select, Stack, Table, TableBody, TableCell,
+  TableHead, TableRow, TextField, Typography, Alert,
+  Button, Paper, IconButton, Tooltip,
 } from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import CommentIcon from '@mui/icons-material/Comment';
+import SearchIcon from '@mui/icons-material/Search';
+import HistoryIcon from '@mui/icons-material/History';
+import PersonIcon from '@mui/icons-material/Person';
+import LogoutIcon from '@mui/icons-material/Logout';
+import AddIcon from '@mui/icons-material/Add';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'; 
 import { useRequests } from '../../hooks/useRequests';
 import { useRequestTypes } from '../../hooks/useRequestTypes';
-import { Request, RequestStatus } from '../../types/request.types';
+import { useAuthContext } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
+import { Request, RequestStatus, AdminDashboardStats } from '../../types/request.types';
 import { RequestType } from '../../types/request_types.types';
+import { UserRole } from '../../types/user.types'; 
 
-const STATUS_LABELS: Record<RequestStatus, string> = {
-  [RequestStatus.PENDING]: 'En attente',
-  [RequestStatus.IN_PROGRESS]: 'En cours',
-  [RequestStatus.ACCEPTED]: 'Acceptée',
-  [RequestStatus.REJECTED]: 'Rejetée',
-  [RequestStatus.CONFIRMED]: 'Confirmée',
+const STATUS_LABEL: Record<string, string> = {
+  PENDING:     'En attente',
+  IN_PROGRESS: 'En cours',
+  ACCEPTED:    'Acceptée',
+  REJECTED:    'Rejetée',
+  CONFIRMED:   'Confirmée',
 };
 
-const STATUS_COLORS: Record<RequestStatus, 'default' | 'info' | 'success' | 'error' | 'primary'> = {
-  [RequestStatus.PENDING]: 'default',
-  [RequestStatus.IN_PROGRESS]: 'info',
-  [RequestStatus.ACCEPTED]: 'success',
-  [RequestStatus.REJECTED]: 'error',
-  [RequestStatus.CONFIRMED]: 'primary',
+const STATUS_COLOR: Record<string, 'warning' | 'info' | 'success' | 'error' | 'secondary'> = {
+  PENDING:     'warning',
+  IN_PROGRESS: 'info',
+  ACCEPTED:    'success',
+  REJECTED:    'error',
+  CONFIRMED:   'secondary',
 };
+const StatCard = ({
+  label,
+  value,
+  status,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  status: string;
+  active: boolean;
+  onClick: (status: string) => void;
+}) => (
+  <Card
+    onClick={() => onClick(status)}
+    sx={{
+      flex: 1,
+      bgcolor: active ? '#f0fdf4' : '#f8fafc',
+      border: `1px solid ${active ? '#22c55e' : '#e2e8f0'}`,
+      borderRadius: 2,
+      transition: 'all 0.2s',
+      cursor: 'pointer',
+      '&:hover': {
+        borderColor: '#22c55e',
+        boxShadow: '0 4px 12px rgba(34, 197, 94, 0.1)',
+        bgcolor: active ? '#f0fdf4' : '#f8fafc',
+      },
+    }}
+  >
+    <CardContent sx={{ p: 2.5 }}>
+      <Typography
+        variant="caption"
+        sx={{
+          color: '#64748b',
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          fontSize: '0.7rem',
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        variant="h4"
+        sx={{
+          fontWeight: 700,
+          color: '#0f172a',
+          mt: 0.5,
+          fontSize: '1.75rem',
+        }}
+      >
+        {value}
+      </Typography>
+    </CardContent>
+  </Card>
+);
 
-type SortField = 'requestNumber' | 'requestDate' | 'requestStatus';
-type SortDirection = 'asc' | 'desc';
-
-export default function AdminRequestsPage() {
+export default function AdminDashboard() {
   const navigate = useNavigate();
-  const {
-    getAllRequests, updateRequestStatus, addComment,
-    loading, error,
-  } = useRequests();
+  const { user } = useAuthContext();
+  const { logout } = useAuth();
+  const { getAllRequests, getAdminStats, loading, error } = useRequests();
   const { getRequestTypes } = useRequestTypes();
 
   const [requests, setRequests] = useState<Request[]>([]);
+  const [stats, setStats] = useState<AdminDashboardStats | null>(null);
+  const [types, setTypes] = useState<RequestType[]>([]);
   const [total, setTotal] = useState(0);
-  const [requestTypes, setRequestTypes] = useState<RequestType[]>([]);
 
+  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'ALL'>('ALL');
-  const [typeFilter, setTypeFilter] = useState<string | 'ALL'>('ALL');
-  const [sortField, setSortField] = useState<SortField>('requestDate');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionTarget, setActionTarget] = useState<Request | null>(null);
-  const [actionType, setActionType] = useState<'ACCEPT' | 'REJECT' | null>(null);
-  const [actionComment, setActionComment] = useState('');
-
-  const [commentTarget, setCommentTarget] = useState<Request | null>(null);
-  const [commentText, setCommentText] = useState('');
+  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const load = async () => {
     try {
-      const [reqData, types] = await Promise.all([
+      const [reqResult, statsResult, typesResult] = await Promise.all([
         getAllRequests({
-          requestStatus: statusFilter === 'ALL' ? undefined : statusFilter,
-          requestTypeId: typeFilter === 'ALL' ? undefined : typeFilter,
-          page: page + 1,
-          limit: rowsPerPage,
+          requestStatus: statusFilter !== 'ALL' ? statusFilter : undefined,
+          requestTypeId: typeFilter !== 'ALL' ? typeFilter : undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
         }),
-        requestTypes.length ? Promise.resolve(requestTypes) : getRequestTypes(),
+        getAdminStats(),
+        getRequestTypes(),
       ]);
-      setRequests(reqData.data);
-      setTotal(reqData.total);
-      if (!requestTypes.length) setRequestTypes(types as RequestType[]);
+      setRequests(reqResult.data);
+      setTotal(reqResult.total);
+      setStats(statsResult);
+      setTypes(typesResult);
     } catch {}
   };
 
-  useEffect(() => { load(); }, [statusFilter, typeFilter, page, rowsPerPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [statusFilter, typeFilter, dateFrom, dateTo]);
 
-  const sortedRequests = [...requests].sort((a, b) => {
-    let cmp = 0;
-    if (sortField === 'requestNumber') cmp = a.requestNumber - b.requestNumber;
-    if (sortField === 'requestDate') cmp = new Date(a.requestDate).getTime() - new Date(b.requestDate).getTime();
-    if (sortField === 'requestStatus') cmp = a.requestStatus.localeCompare(b.requestStatus);
-    return sortDirection === 'asc' ? cmp : -cmp;
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout failed', err);
+    }
+  };
+
+  const handleStatusClick = (status: string) => {
+    setStatusFilter(status as RequestStatus | 'ALL');
+  };
+
+  const filtered = requests.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      r.user?.firstName?.toLowerCase().includes(q) ||
+      r.user?.lastName?.toLowerCase().includes(q) ||
+      r.requestType?.name?.toLowerCase().includes(q) ||
+      String(r.requestNumber).includes(q)
+    );
   });
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
-
-  const openAction = (request: Request, type: 'ACCEPT' | 'REJECT') => {
-    setActionTarget(request);
-    setActionType(type);
-    setActionComment('');
-  };
-
-  const closeAction = () => {
-    setActionTarget(null);
-    setActionType(null);
-    setActionComment('');
-  };
-
-  const confirmAction = async () => {
-    if (!actionTarget || !actionType) return;
-    setActionError(null);
-    try {
-      await updateRequestStatus(actionTarget.id, {
-        requestStatus: actionType === 'ACCEPT' ? RequestStatus.ACCEPTED : RequestStatus.REJECTED,
-        adminComment: actionComment || undefined,
-      });
-      closeAction();
-      await load();
-    } catch (e: any) {
-      setActionError(e.response?.data?.message ?? 'Erreur lors de la mise à jour.');
-    }
-  };
-
-  const openComment = (request: Request) => {
-    setCommentTarget(request);
-    setCommentText('');
-  };
-
-  const submitComment = async () => {
-    if (!commentTarget || !commentText.trim()) return;
-    setActionError(null);
-    try {
-      await addComment(commentTarget.id, { comment: commentText.trim() });
-      setCommentTarget(null);
-      setCommentText('');
-      await load();
-    } catch (e: any) {
-      setActionError(e.response?.data?.message ?? "Erreur lors de l'ajout du commentaire.");
-    }
-  };
-
-  const isClosed = (status: RequestStatus) =>
-    status === RequestStatus.ACCEPTED ||
-    status === RequestStatus.REJECTED ||
-    status === RequestStatus.CONFIRMED;
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
 
   return (
-    <Box sx={{ p: 5 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Demandes en cours</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {total} demande{total > 1 ? 's' : ''} au total
-          </Typography>
-        </Box>
-      </Stack>
+    <Box sx={{ p: 3, bgcolor: '#f8fafc', minHeight: '100vh' }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3,
+          mb: 3,
+          bgcolor: 'white',
+          borderRadius: 3,
+          border: '1px solid #e2e8f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2,
+        }}
+      >
+        <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
+          {isSuperAdmin && (
+            <IconButton
+              onClick={() => navigate('/super-admin')}
+              sx={{
+                color: '#64748b',
+                '&:hover': { color: '#22c55e', bgcolor: '#f0fdf4' },
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          )}
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box component="img" src="/otc_logo.png" alt="OTC" sx={{ height: 40, width: 'auto' }} />
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                OTC
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.8rem', display: 'block', lineHeight: 1.2 }}>
+                Office de la Topographie et du Cadastre
+              </Typography>
+            </Box>
+          </Stack>
 
-      {(error || actionError) && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError(null)}>
-          {error || actionError}
-        </Alert>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#0f172a' }}>
+              Bonjour, {user?.firstName}
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+              Gérez toutes les demandes administratives de l'application.
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            startIcon={<PersonIcon />}
+            onClick={() => navigate('/admin/profile')}
+            sx={{
+              borderColor: '#e2e8f0',
+              color: '#475569',
+              '&:hover': { borderColor: '#22c55e', bgcolor: '#f0fdf4' },
+            }}
+          >
+            Mon profil
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<LogoutIcon />}
+            onClick={handleLogout}
+            sx={{
+              borderColor: '#e2e8f0',
+              color: '#475569',
+              '&:hover': { borderColor: '#ef4444', color: '#ef4444', bgcolor: '#fef2f2' },
+            }}
+          >
+            Déconnexion
+          </Button>
+        </Stack>
+      </Paper>
+
+      {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>}
+
+      {stats && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 2, mb: 3 }}>
+          <StatCard
+            label="Total"
+            value={stats.total}
+            status="ALL"
+            active={statusFilter === 'ALL'}
+            onClick={handleStatusClick}
+          />
+          <StatCard
+            label="En attente"
+            value={stats.pending}
+            status="PENDING"
+            active={statusFilter === 'PENDING'}
+            onClick={handleStatusClick}
+          />
+          <StatCard
+            label="En cours"
+            value={stats.inProgress}
+            status="IN_PROGRESS"
+            active={statusFilter === 'IN_PROGRESS'}
+            onClick={handleStatusClick}
+          />
+          <StatCard
+            label="Acceptées"
+            value={stats.accepted}
+            status="ACCEPTED"
+            active={statusFilter === 'ACCEPTED'}
+            onClick={handleStatusClick}
+          />
+          <StatCard
+            label="Rejetées"
+            value={stats.rejected}
+            status="REJECTED"
+            active={statusFilter === 'REJECTED'}
+            onClick={handleStatusClick}
+          />
+          <StatCard
+            label="Confirmées"
+            value={stats.confirmed}
+            status="CONFIRMED"
+            active={statusFilter === 'CONFIRMED'}
+            onClick={handleStatusClick}
+          />
+        </Box>
       )}
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
-        <FormControl sx={{ minWidth: 180 }}>
-          <InputLabel>Statut</InputLabel>
-          <Select
-            value={statusFilter}
-            label="Statut"
-            onChange={(e) => { setPage(0); setStatusFilter(e.target.value as RequestStatus | 'ALL'); }}
-          >
-            <MenuItem value="ALL">Tous les statuts</MenuItem>
-            {Object.values(RequestStatus).map((s) => (
-              <MenuItem key={s} value={s}>{STATUS_LABELS[s]}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl sx={{ minWidth: 220 }}>
-          <InputLabel>Type de demande</InputLabel>
-          <Select
-            value={typeFilter}
-            label="Type de demande"
-            onChange={(e) => { setPage(0); setTypeFilter(e.target.value); }}
-          >
-            <MenuItem value="ALL">Tous les types</MenuItem>
-            {requestTypes.map((rt) => (
-              <MenuItem key={rt.id} value={rt.id}>{rt.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Stack>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          mb: 3,
+          bgcolor: 'white',
+          borderRadius: 3,
+          border: '1px solid #e2e8f0',
+        }}
+      >
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <TextField
+            placeholder="Rechercher par agent, type, numéro..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ flex: 1 }}
+            size="small"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: '#94a3b8', fontSize: 20 }} />
+                  </InputAdornment>
+                ),
+                sx: { bgcolor: '#f8fafc', borderRadius: 2 }
+              },
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel sx={{ color: '#64748b' }}>Type</InputLabel>
+            <Select
+              value={typeFilter}
+              label="Type"
+              onChange={(e) => setTypeFilter(e.target.value)}
+              sx={{ bgcolor: '#f8fafc', borderRadius: 2 }}
+            >
+              <MenuItem value="ALL">Tous les types</MenuItem>
+              {types.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel sx={{ color: '#64748b' }}>Statut</InputLabel>
+            <Select
+              value={statusFilter}
+              label="Statut"
+              onChange={(e) => setStatusFilter(e.target.value as RequestStatus | 'ALL')}
+              sx={{ bgcolor: '#f8fafc', borderRadius: 2 }}
+            >
+              <MenuItem value="ALL">Tous</MenuItem>
+              {Object.entries(STATUS_LABEL).map(([val, label]) => (
+                <MenuItem key={val} value={val}>{label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            label="Du"
+            type="date"
+            size="small"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            slotProps={{
+              inputLabel: { shrink: true },
+              input: { sx: { bgcolor: '#f8fafc', borderRadius: 2 } }
+            }}
+          />
+          <TextField
+            label="Au"
+            type="date"
+            size="small"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            slotProps={{
+              inputLabel: { shrink: true },
+              input: { sx: { bgcolor: '#f8fafc', borderRadius: 2 } }
+            }}
+          />
+          {(statusFilter !== 'ALL' || typeFilter !== 'ALL' || dateFrom || dateTo) && (
+            <Button
+              size="small"
+              onClick={() => { setStatusFilter('ALL'); setTypeFilter('ALL'); setDateFrom(''); setDateTo(''); }}
+              sx={{
+                color: '#64748b',
+                '&:hover': { color: '#0f172a' }
+              }}
+            >
+              Réinitialiser
+            </Button>
+          )}
+        </Stack>
+      </Paper>
 
-      <Card variant="outlined">
+      <Paper
+        elevation={0}
+        sx={{
+          bgcolor: 'white',
+          borderRadius: 3,
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden',
+        }}
+      >
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}>
-            <CircularProgress />
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
+            <CircularProgress size={36} sx={{ color: '#22c55e' }} />
           </Box>
-        ) : sortedRequests.length === 0 ? (
-          <Box sx={{ textAlign: 'center', p: 6, color: 'text.secondary' }}>
-            <Typography>Aucune demande trouvée.</Typography>
+        ) : filtered.length === 0 ? (
+          <Box sx={{ textAlign: 'center', p: 8 }}>
+            <Typography sx={{ color: '#94a3b8', mb: 2 }}>
+              Aucune demande trouvée.
+            </Typography>
           </Box>
         ) : (
           <>
             <Table>
               <TableHead>
-                <TableRow>
-                  <TableCell>
-                    <TableSortLabel
-                      active={sortField === 'requestNumber'}
-                      direction={sortField === 'requestNumber' ? sortDirection : 'asc'}
-                      onClick={() => handleSort('requestNumber')}
-                    >
-                      N°
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>Agent</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={sortField === 'requestDate'}
-                      direction={sortField === 'requestDate' ? sortDirection : 'asc'}
-                      onClick={() => handleSort('requestDate')}
-                    >
-                      Date
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={sortField === 'requestStatus'}
-                      direction={sortField === 'requestStatus' ? sortDirection : 'asc'}
-                      onClick={() => handleSort('requestStatus')}
-                    >
-                      Statut
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                  <TableCell sx={{ fontWeight: 600, color: '#475569' }}>N°</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Agent</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Type</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Soumis le</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Statut</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, color: '#475569' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {sortedRequests.map((request) => (
-                  <TableRow key={request.id} hover>
+                {filtered.map((r) => (
+                  <TableRow
+                    key={r.id}
+                    hover
+                    onClick={() => navigate(`/admin/requests/${r.id}`)}
+                    sx={{
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: '#f0fdf4' },
+                      '&:last-child td, &:last-child th': { border: 0 },
+                    }}
+                  >
                     <TableCell>
-                      <Typography variant="body2" fontWeight={600}>#{request.requestNumber}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {request.user?.firstName} {request.user?.lastName}
+                      <Typography fontWeight={700} variant="body2" sx={{ color: '#0f172a' }}>
+                        {r.requestNumber}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
-                        {request.user?.email}
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                        {r.user?.firstName} {r.user?.lastName}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#64748b' }}>
+                        {r.user?.email}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">{request.requestType?.name ?? '—'}</Typography>
+                      <Typography variant="body2" sx={{ color: '#1e293b' }}>
+                        {r.requestType?.name || '-'}
+                      </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
-                        {new Date(request.requestDate).toLocaleDateString('fr-FR')}
+                      <Typography variant="body2" sx={{ color: '#64748b' }}>
+                        {new Date(r.requestDate).toLocaleDateString('fr-FR')}
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={STATUS_LABELS[request.requestStatus]}
-                        color={STATUS_COLORS[request.requestStatus]}
+                        label={STATUS_LABEL[r.requestStatus] ?? r.requestStatus}
+                        color={STATUS_COLOR[r.requestStatus] ?? 'default'}
                         size="small"
+                        sx={{ fontWeight: 500, '& .MuiChip-label': { px: 1.5 } }}
                       />
                     </TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
-                        <Tooltip title="Voir le détail">
-                          <IconButton size="small" onClick={() => navigate(`/admin/requests/${request.id}`)}>
-                            <VisibilityIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Ajouter un commentaire">
-                          <IconButton
-                            size="small"
-                            onClick={() => openComment(request)}
-                            disabled={isClosed(request.requestStatus)}
-                          >
-                            <CommentIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Accepter">
-                          <IconButton
-                            size="small"
-                            color="success"
-                            onClick={() => openAction(request, 'ACCEPT')}
-                            disabled={isClosed(request.requestStatus)}
-                          >
-                            <CheckCircleIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Rejeter">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => openAction(request, 'REJECT')}
-                            disabled={isClosed(request.requestStatus)}
-                          >
-                            <CancelIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                      {r.requestStatus === RequestStatus.PENDING || r.requestStatus === RequestStatus.IN_PROGRESS ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => navigate(`/admin/requests/${r.id}`)}
+                          sx={{
+                            borderColor: '#22c55e',
+                            color: '#22c55e',
+                            '&:hover': {
+                              bgcolor: '#f0fdf4',
+                              borderColor: '#16a34a',
+                            }
+                          }}
+                        >
+                          Traiter
+                        </Button>
+                      ) : r.requestStatus === RequestStatus.CONFIRMED ? (
+                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                          Clôturée
+                        </Typography>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-            <TablePagination
-              component="div"
-              count={total}
-              page={page}
-              onPageChange={(_e, newPage) => setPage(newPage)}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              labelRowsPerPage="Lignes par page"
-            />
+            <Box sx={{ p: 2, borderTop: '1px solid #f1f5f9', bgcolor: '#fafcfc' }}>
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                {filtered.length} demande{filtered.length > 1 ? 's' : ''} affichée{filtered.length > 1 ? 's' : ''} sur {total}
+              </Typography>
+            </Box>
           </>
         )}
-      </Card>
-
-      {/* Accept / Reject dialog */}
-      <Dialog open={!!actionTarget} onClose={closeAction} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {actionType === 'ACCEPT' ? 'Accepter la demande' : 'Rejeter la demande'}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            {actionType === 'ACCEPT'
-              ? 'Confirmez-vous l\'acceptation de cette demande ?'
-              : 'Confirmez-vous le rejet de cette demande ?'}
-            {' '}Demande #{actionTarget?.requestNumber} — {actionTarget?.user?.firstName} {actionTarget?.user?.lastName}
-          </DialogContentText>
-          <TextField
-            label="Commentaire (optionnel)"
-            multiline
-            rows={3}
-            fullWidth
-            value={actionComment}
-            onChange={(e) => setActionComment(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeAction}>Annuler</Button>
-          <Button
-            onClick={confirmAction}
-            variant="contained"
-            color={actionType === 'ACCEPT' ? 'success' : 'error'}
-          >
-            {actionType === 'ACCEPT' ? 'Accepter' : 'Rejeter'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Add comment dialog */}
-      <Dialog open={!!commentTarget} onClose={() => setCommentTarget(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Ajouter un commentaire</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Demande #{commentTarget?.requestNumber} — {commentTarget?.user?.firstName} {commentTarget?.user?.lastName}
-          </DialogContentText>
-          <TextField
-            label="Commentaire"
-            multiline
-            rows={3}
-            fullWidth
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            autoFocus
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCommentTarget(null)}>Annuler</Button>
-          <Button onClick={submitComment} variant="contained" disabled={!commentText.trim()}>
-            Ajouter
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </Paper>
     </Box>
   );
 }

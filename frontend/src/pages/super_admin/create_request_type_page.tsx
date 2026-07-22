@@ -4,12 +4,13 @@ import {
   Box, Button, Card, CardContent, Divider, FormControl,
   FormControlLabel, IconButton, InputLabel, MenuItem,
   Select, Stack, Switch, TextField, Typography, Alert,
+  Paper,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useRequestTypes } from '../../hooks/useRequestTypes';
 import { FieldType, CreateFieldDto } from '../../types/request_types.types';
+import Navbar from '../../components/super_admin/Navbar';
 
 const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   [FieldType.TEXT]: 'Texte',
@@ -80,29 +81,42 @@ export default function CreateRequestTypePage() {
   };
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', py: 3, px: 2 }}>
-      <Stack direction="row" alignItems="center" spacing={1} mb={3}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/super-admin/request-types')}
-          color="inherit"
-          size="small"
+    <Box sx={{ p: 3, bgcolor: '#f8fafc', minHeight: '100vh' }}>
+      <Box sx={{ maxWidth: 800, mx: 'auto' }}>
+        <Navbar showBack />
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 3,
+            bgcolor: 'white',
+            borderRadius: 3,
+            border: '1px solid #e2e8f0',
+          }}
         >
-          Retour
-        </Button>
-      </Stack>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#0f172a', mb: 0.5 }}>
+            Nouveau type de demande
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            Définissez le nom, la description et les champs spécifiques à ce type de demande.
+          </Typography>
+        </Paper>
 
-      <Typography variant="h5" fontWeight={700} mb={1}>Nouveau type de demande</Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Définissez le nom, la description et les champs spécifiques à ce type de demande.
-      </Typography>
-
-      {(error || formError) && (
-        <Alert severity="error" sx={{ mb: 2 }}>{formError || error}</Alert>
-      )}
-
-      <Card variant="outlined" sx={{ mb: 3 }}>
-        <CardContent>
+        {(error || formError) && (
+          <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+            {formError || error}
+          </Alert>
+        )}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 3,
+            bgcolor: 'white',
+            borderRadius: 3,
+            border: '1px solid #e2e8f0',
+          }}
+        >
           <Stack spacing={2}>
             <TextField
               label="Nom du type de demande"
@@ -110,6 +124,8 @@ export default function CreateRequestTypePage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              size="small"
+              sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
             />
             <TextField
               label="Description"
@@ -118,22 +134,41 @@ export default function CreateRequestTypePage() {
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              size="small"
+              sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
             />
           </Stack>
-        </CardContent>
-      </Card>
+        </Paper>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.5 }}>
+            Champs
+          </Typography>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={addField}
+            size="small"
+            sx={{
+              color: '#22c55e',
+              '&:hover': { bgcolor: '#f0fdf4' },
+              py: 0.5,
+            }}
+          >
+            Ajouter un champ
+          </Button>
+        </Stack>
 
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
-        <Typography variant="subtitle1" fontWeight={700}>Champs</Typography>
-        <Button startIcon={<AddIcon />} onClick={addField} size="small">
-          Ajouter un champ
-        </Button>
-      </Stack>
-
-      <Stack spacing={2}>
-        {fields.map((field, index) => (
-          <Card key={index} variant="outlined">
-            <CardContent>
+        <Stack spacing={2}>
+          {fields.map((field, index) => (
+            <Paper
+              key={index}
+              elevation={0}
+              sx={{
+                p: 2.5,
+                bgcolor: 'white',
+                borderRadius: 3,
+                border: '1px solid #e2e8f0',
+              }}
+            >
               <Stack direction="row" spacing={2} alignItems="flex-start">
                 <Stack spacing={2} flex={1}>
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -143,13 +178,16 @@ export default function CreateRequestTypePage() {
                       onChange={(e) => updateField(index, { fieldName: e.target.value })}
                       fullWidth
                       required
+                      size="small"
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
                     />
-                    <FormControl fullWidth>
-                      <InputLabel>Type</InputLabel>
+                    <FormControl fullWidth size="small">
+                      <InputLabel sx={{ color: '#64748b' }}>Type</InputLabel>
                       <Select
                         value={field.fieldType}
                         label="Type"
                         onChange={(e) => updateField(index, { fieldType: e.target.value as FieldType })}
+                        sx={{ bgcolor: '#f8fafc' }}
                       >
                         {Object.values(FieldType).map((ft) => (
                           <MenuItem key={ft} value={ft}>{FIELD_TYPE_LABELS[ft]}</MenuItem>
@@ -162,41 +200,77 @@ export default function CreateRequestTypePage() {
                     value={field.description}
                     onChange={(e) => updateField(index, { description: e.target.value })}
                     fullWidth
+                    size="small"
+                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
                   />
                   <FormControlLabel
                     control={
                       <Switch
                         checked={field.isRequired}
                         onChange={(e) => updateField(index, { isRequired: e.target.checked })}
+                        sx={{
+                          '& .MuiSwitch-switchBase.Mui-checked': {
+                            color: '#22c55e',
+                          },
+                          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                            bgcolor: '#22c55e',
+                          },
+                        }}
                       />
                     }
-                    label="Champ obligatoire"
+                    label={
+                      <Typography variant="body2" sx={{ color: '#1e293b' }}>
+                        Champ obligatoire
+                      </Typography>
+                    }
                   />
                 </Stack>
                 <IconButton
                   color="error"
                   onClick={() => removeField(index)}
                   disabled={fields.length === 1}
-                  sx={{ mt: 1 }}
+                  sx={{
+                    mt: 1,
+                    color: '#64748b',
+                    '&:hover': {
+                      bgcolor: '#fef2f2',
+                      color: '#ef4444',
+                    },
+                  }}
                 >
-                  <DeleteIcon />
+                  <DeleteIcon fontSize="small" />
                 </IconButton>
               </Stack>
-            </CardContent>
-          </Card>
-        ))}
-      </Stack>
+            </Paper>
+          ))}
+        </Stack>
 
-      <Divider sx={{ my: 3 }} />
-
-      <Stack direction="row" justifyContent="flex-end" spacing={2}>
-        <Button onClick={() => navigate('/super-admin/request-types')} color="inherit">
-          Annuler
-        </Button>
-        <Button variant="contained" onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Création...' : 'Créer le type de demande'}
-        </Button>
-      </Stack>
+        <Divider sx={{ my: 3, borderColor: '#f1f5f9' }} />
+        <Stack direction="row" justifyContent="flex-end" spacing={2}>
+          <Button
+            onClick={() => navigate('/super-admin/request-types')}
+            sx={{
+              color: '#64748b',
+              '&:hover': { bgcolor: '#f1f5f9' },
+            }}
+          >
+            Annuler
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={loading}
+            sx={{
+              bgcolor: '#22c55e',
+              '&:hover': {
+                bgcolor: '#16a34a',
+              },
+            }}
+          >
+            {loading ? 'Création...' : 'Créer le type de demande'}
+          </Button>
+        </Stack>
+      </Box>
     </Box>
   );
 }

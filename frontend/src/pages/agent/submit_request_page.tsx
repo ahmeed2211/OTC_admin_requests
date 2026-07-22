@@ -4,19 +4,23 @@ import {
   Box, Button, Card, CardContent, CircularProgress,
   Divider, FormControl, InputLabel, MenuItem, Select,
   Stack, Step, StepLabel, Stepper, TextField,
-  Typography, Alert, Chip, IconButton,
+  Typography, Alert, Chip, IconButton, Paper,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SendIcon from '@mui/icons-material/Send';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloseIcon from '@mui/icons-material/Close';
+import PersonIcon from '@mui/icons-material/Person';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useRequestTypes } from '../../hooks/useRequestTypes';
 import { useRequests } from '../../hooks/useRequests';
+import { useAuthContext } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { RequestType, RequestTypeField, FieldType } from '../../types/request_types.types';
 import { FieldValueDto } from '../../types/request.types';
 
 const STEPS = ['Type de demande', 'Informations', 'Confirmation'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const ALLOWED_TYPES = [
   'application/pdf',
   'image/png',
@@ -97,6 +101,8 @@ const DynamicField = ({
 
 export default function SubmitRequestPage() {
   const navigate = useNavigate();
+  const { user } = useAuthContext();
+  const { logout } = useAuth();
   const { getRequestTypes, getRequestTypeById, loading: typesLoading } = useRequestTypes();
   const { createRequest, loading: submitting, error: submitError } = useRequests();
 
@@ -110,7 +116,6 @@ export default function SubmitRequestPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState('');
   const [success, setSuccess] = useState(false);
-
   useEffect(() => {
     getRequestTypes().then(setRequestTypes).catch(() => {});
   }, []);
@@ -136,7 +141,7 @@ export default function SubmitRequestPage() {
         setFieldErrors({});
       })
       .catch(() => {});
-  }, [selectedTypeId]); 
+  }, [selectedTypeId]);
 
   const setFieldValue = (fieldId: string, value: string) => {
     setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
@@ -147,7 +152,7 @@ export default function SubmitRequestPage() {
 
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? []);
-    e.target.value = ''; 
+    e.target.value = '';
     if (!selected.length) return;
 
     const rejected: string[] = [];
@@ -157,7 +162,7 @@ export default function SubmitRequestPage() {
       if (!ALLOWED_TYPES.includes(f.type)) {
         rejected.push(`${f.name} (type non autorisé)`);
       } else if (f.size > MAX_FILE_SIZE) {
-        rejected.push(`${f.name} (> 10 Mo)`);
+        rejected.push(`${f.name} (> 2 Mo)`);
       } else {
         accepted.push(f);
       }
@@ -211,10 +216,18 @@ export default function SubmitRequestPage() {
         files,
       );
       setSuccess(true);
-      setTimeout(() => navigate('/my-requests'), 2000);
+      setTimeout(() => navigate('/dashboard'), 2000);
     } catch {}
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout failed', err);
+    }
+  };
   const renderStep0 = () => (
     <Stack spacing={3}>
       <Typography variant="body2" color="text.secondary">
@@ -233,11 +246,11 @@ export default function SubmitRequestPage() {
               onClick={() => setSelectedTypeId(rt.id)}
               sx={{
                 cursor: 'pointer',
-                borderColor: selectedTypeId === rt.id ? 'primary.main' : 'divider',
+                borderColor: selectedTypeId === rt.id ? '#22c55e' : '#e2e8f0',
                 borderWidth: selectedTypeId === rt.id ? 2 : 1,
-                bgcolor: selectedTypeId === rt.id ? 'primary.50' : 'background.paper',
+                bgcolor: selectedTypeId === rt.id ? '#f0fdf4' : 'white',
                 transition: 'all .15s',
-                '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' },
+                '&:hover': { borderColor: '#22c55e', bgcolor: '#f0fdf4' },
               }}
             >
               <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
@@ -276,7 +289,7 @@ export default function SubmitRequestPage() {
         </Box>
       )}
 
-      <Divider />
+      <Divider sx={{ borderColor: '#f1f5f9' }} />
 
       <TextField
         label="Commentaire additionnel"
@@ -288,9 +301,10 @@ export default function SubmitRequestPage() {
         placeholder="Informations complémentaires sur votre demande..."
         inputProps={{ maxLength: 1000 }}
         helperText={`${requestComment.length}/1000`}
+        sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#f8fafc' } }}
       />
 
-      <Divider />
+      <Divider sx={{ borderColor: '#f1f5f9' }} />
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary" mb={1.5}>
@@ -301,6 +315,7 @@ export default function SubmitRequestPage() {
           variant="outlined"
           startIcon={<AttachFileIcon />}
           size="small"
+          sx={{ borderColor: '#e2e8f0', color: '#475569', '&:hover': { borderColor: '#22c55e', color: '#22c55e', bgcolor: '#f0fdf4' } }}
         >
           Ajouter des fichiers
           <input
@@ -312,7 +327,7 @@ export default function SubmitRequestPage() {
           />
         </Button>
         <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-          PDF, images ou Word - 10 Mo max par fichier.
+          PDF, images ou Word - 2 Mo max par fichier.
         </Typography>
 
         {fileError && (
@@ -341,11 +356,11 @@ export default function SubmitRequestPage() {
 
   const renderStep2 = () => (
     <Stack spacing={2}>
-      <Alert severity="info">
+      <Alert severity="info" sx={{ borderRadius: 2 }}>
         Veuillez vérifier les informations avant de soumettre votre demande.
       </Alert>
 
-      <Card variant="outlined">
+      <Card variant="outlined" sx={{ borderColor: '#e2e8f0' }}>
         <CardContent>
           <Typography variant="subtitle2" color="text.secondary" mb={1}>TYPE DE DEMANDE</Typography>
           <Typography fontWeight={600}>{selectedType?.name}</Typography>
@@ -353,7 +368,7 @@ export default function SubmitRequestPage() {
       </Card>
 
       {selectedType && selectedType.fields.length > 0 && (
-        <Card variant="outlined">
+        <Card variant="outlined" sx={{ borderColor: '#e2e8f0' }}>
           <CardContent>
             <Typography variant="subtitle2" color="text.secondary" mb={1.5}>CHAMPS RENSEIGNÉS</Typography>
             <Stack spacing={1}>
@@ -375,7 +390,7 @@ export default function SubmitRequestPage() {
       )}
 
       {requestComment && (
-        <Card variant="outlined">
+        <Card variant="outlined" sx={{ borderColor: '#e2e8f0' }}>
           <CardContent>
             <Typography variant="subtitle2" color="text.secondary" mb={1}>COMMENTAIRE</Typography>
             <Typography variant="body2">{requestComment}</Typography>
@@ -384,7 +399,7 @@ export default function SubmitRequestPage() {
       )}
 
       {files.length > 0 && (
-        <Card variant="outlined">
+        <Card variant="outlined" sx={{ borderColor: '#e2e8f0' }}>
           <CardContent>
             <Typography variant="subtitle2" color="text.secondary" mb={1}>
               PIÈCES JOINTES ({files.length})
@@ -403,64 +418,151 @@ export default function SubmitRequestPage() {
   );
 
   return (
-    <Box sx={{ maxWidth: 700, mx: 'auto', py: 3, px: 2 }}>
-      <Stack direction="row" alignItems="center" spacing={1} mb={3}>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/my-requests')} color="inherit" size="small">
+    <Box sx={{ p: 3, bgcolor: '#f8fafc', minHeight: '100vh' }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3,
+          mb: 3,
+          bgcolor: 'white',
+          borderRadius: 3,
+          border: '1px solid #e2e8f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2,
+        }}
+      >        <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box component="img" src="/otc_logo.png" alt="OTC" sx={{ height: 40, width: 'auto' }} />
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                OTC
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.8rem', display: 'block', lineHeight: 1.2 }}>
+                Office de la Topographie et du Cadastre
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#0f172a' }}>
+              Nouvelle demande
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+              Suivez les étapes pour soumettre votre demande administrative.
+            </Typography>
+          </Box>
+        </Stack>
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            startIcon={<PersonIcon />}
+            onClick={() => navigate('/profile')}
+            sx={{
+              borderColor: '#e2e8f0',
+              color: '#475569',
+              '&:hover': { borderColor: '#22c55e', bgcolor: '#f0fdf4' },
+            }}
+          >
+            Mon profil
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<LogoutIcon />}
+            onClick={handleLogout}
+            sx={{
+              borderColor: '#e2e8f0',
+              color: '#475569',
+              '&:hover': { borderColor: '#ef4444', color: '#ef4444', bgcolor: '#fef2f2' },
+            }}
+          >
+            Déconnexion
+          </Button>
+        </Stack>
+      </Paper>
+
+      <Box sx={{ maxWidth: 700, mx: 'auto' }}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate(-1)}
+          size="small"
+          sx={{
+            color: '#64748b',
+            mb: 3,
+            '&:hover': {
+              color: '#22c55e',
+              bgcolor: '#f0fdf4',
+            },
+          }}
+        >
           Retour
         </Button>
-      </Stack>
 
-      <Typography variant="h5" fontWeight={700} mb={1}>Nouvelle demande</Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Suivez les étapes pour soumettre votre demande administrative.
-      </Typography>
-
-      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-        {STEPS.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
-
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          Demande soumise avec succès ! Redirection vers vos demandes...
-        </Alert>
-      )}
-
-      {submitError && (
-        <Alert severity="error" sx={{ mb: 2 }}>{submitError}</Alert>
-      )}
-
-      <Card variant="outlined">
-        <CardContent sx={{ p: 3 }}>
+        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+          {STEPS.map((label) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+        {success && (
+          <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+            Demande soumise avec succès ! Redirection vers vos demandes...
+          </Alert>
+        )}
+        {submitError && (
+          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{submitError}</Alert>
+        )}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            bgcolor: 'white',
+            borderRadius: 3,
+            border: '1px solid #e2e8f0',
+          }}
+        >
           {activeStep === 0 && renderStep0()}
           {activeStep === 1 && renderStep1()}
           {activeStep === 2 && renderStep2()}
-        </CardContent>
-      </Card>
-
-      <Stack direction="row" justifyContent="space-between" mt={3}>
-        <Button onClick={handleBack} disabled={activeStep === 0} color="inherit">
-          Retour
-        </Button>
-        {activeStep < STEPS.length - 1 ? (
-          <Button variant="contained" onClick={handleNext} disabled={activeStep === 0 && !selectedTypeId}>
-            Suivant
-          </Button>
-        ) : (
+        </Paper>
+        <Stack direction="row" justifyContent="space-between" mt={3}>
           <Button
-            variant="contained"
-            color="success"
-            startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
-            onClick={handleSubmit}
-            disabled={submitting || success}
+            onClick={handleBack}
+            disabled={activeStep === 0}
+            color="inherit"
+            sx={{
+              color: '#64748b',
+              '&:hover': { color: '#22c55e', bgcolor: '#f0fdf4' },
+            }}
           >
-            {submitting ? 'Envoi en cours...' : 'Soumettre la demande'}
+            Retour
           </Button>
-        )}
-      </Stack>
+          {activeStep < STEPS.length - 1 ? (
+            <Button
+              variant="contained"
+              onClick={handleNext}
+              disabled={activeStep === 0 && !selectedTypeId}
+              sx={{ bgcolor: '#22c55e', '&:hover': { bgcolor: '#16a34a' } }}
+            >
+              Suivant
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+              onClick={handleSubmit}
+              disabled={submitting || success}
+              sx={{ bgcolor: '#22c55e', '&:hover': { bgcolor: '#16a34a' } }}
+            >
+              {submitting ? 'Envoi en cours...' : 'Soumettre la demande'}
+            </Button>
+          )}
+        </Stack>
+      </Box>
     </Box>
   );
 }
